@@ -1,3 +1,5 @@
+const { Vector3 } = require("three");
+
 (function () {
 
 	var appSettings;
@@ -42,7 +44,8 @@
 			},
 
 			addGrid: function(size, worldColor, gridColor) {
-
+				
+				let zBuff = gfx.appSettings.zBuffer;
 				var planeGeometry = new THREE.PlaneBufferGeometry(size, size);
 				planeGeometry.rotateX(-Math.PI / 2);
 				var planeMaterial = new THREE.ShadowMaterial();
@@ -54,8 +57,8 @@
 				var helper = new THREE.GridHelper(size, 20, gridColor, gridColor);
 				helper.material.opacity = .75;
 				helper.material.transparent = true;
+				helper.position.set(zBuff, 0, -zBuff);
 				scene.add(helper);
-				
 				
 				let wall = new THREE.GridHelper(size, 20, gridColor, gridColor);
 				wall.material.opacity = .75;
@@ -63,21 +66,38 @@
 				
 				let left = wall.clone();
 				left.rotation.x = Math.PI/2;
-				left.position.set(0, 50, -50);
+				left.position.set(0, size/2, -size/2 - zBuff);
 				scene.add(left);
 				let right = helper.clone();
 				right.rotation.set(Math.PI/2, 0, Math.PI/2);
-				right.position.set(50, 50, 0);
+				right.position.set(size/2, size/2, -zBuff);
 				scene.add(right);
 				
-				let zBuff = gfx.appSettings.zBuffer;
 				let white = 0xffffff;
-				gfx.drawLine(new THREE.Vector3(-50, 0, -50 + zBuff), new THREE.Vector3(-50, 75, -50 + zBuff), white, .5);
-				gfx.drawLine(new THREE.Vector3(50, 0, -50 + zBuff), new THREE.Vector3(50, 75, -50 + zBuff), white, .5);
-				gfx.drawLine(new THREE.Vector3(50, 0, 50 + zBuff), new THREE.Vector3(50, 75, 50 + zBuff), white, .5);
+				let bottomLeft = new THREE.Vector3(-size/2, 0, -size/2), nearestCorner = new THREE.Vector3(-size/2, 0, size/2);
+				gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, size, -size/2), white, .5);
+				gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, 0, size/2), white, .5);
+				gfx.drawLineFromPoints(new THREE.Vector3(-size/2, 0, size/2), new THREE.Vector3(size/2, 0, size/2), white, .5);
 	
 				scene.background = worldColor;
 				//scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
+				
+				let count = 10;
+				let length = size;
+				let tickLength = 1;
+				let tick = new THREE.Vector3(-tickLength, 0, 0), tickRight = new THREE.Vector3(0, 0, tickLength);
+				for (let i = 0; i < count+ 1; i++) { // y-axis ticks
+					let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*(length/count), 0));
+					gfx.drawLine(tickOrigin, tick);
+				}
+				for (let i = 0; i < count+ 1; i++) { // z-axis ticks
+					let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, i*(length/count)));
+					gfx.drawLine(tickOrigin, tick);
+				}
+				for (let i = 0; i < count+ 1; i++) { // x-axis ticks
+					let tickOrigin = gfx.movePoint(nearestCorner, new THREE.Vector3(i*(length/count), 0, 0));
+					gfx.drawLine(tickOrigin, tickRight);
+				}
 				
 				return plane;
 			},
@@ -247,7 +267,25 @@
 				}
 			},
 
-			drawLine: function(pt1, pt2, color, alpha) {
+			drawLine: function(origin, vector, color, alpha) {
+				
+				color = color || 0xffffff;
+				alpha = alpha || 1;
+				
+				let material = new THREE.LineBasicMaterial({
+					color: color,
+					opacity: alpha,
+					transparent: true
+				});
+				let geometry = new THREE.Geometry();
+				geometry.vertices.push(origin);
+				geometry.vertices.push(gfx.movePoint(origin, vector));
+				
+				let line = new THREE.Line(geometry, material);
+				scene.add(line);
+			},
+			
+			drawLineFromPoints: function(pt1, pt2, color, alpha) {
 				
 				color = color || 0x0000ff;
 				alpha = alpha || 1;

@@ -34,7 +34,7 @@ module.exports = function() {
 			scene = gfx.setUpScene();
 			renderer = gfx.setUpRenderer(renderer);
 			camera = gfx.setUpCamera(camera);
-			floor = gfx.addGrid(settings.gridSize, settings.colors.worldColor, settings.colors.gridColor);
+			floor = self.addGrid(settings.gridSize, settings.colors.worldColor, settings.colors.gridColor);
 			controls = gfx.enableControls(controls, renderer, camera);
 			gfx.resizeRendererOnWindowResize(renderer, camera);
 			gfx.setUpLights();
@@ -195,7 +195,7 @@ module.exports = function() {
 					let mesh = new THREE.Points(geometry, material);
 					// bunny
 					mesh.scale.set(500, 500, 500);
-					mesh.position.y -= 16.5;
+					mesh.position.y -= 16.5; mesh.position.x += 10;
 					scene.add(mesh)
 				},
 				function (xhr) { // in progress
@@ -213,6 +213,79 @@ module.exports = function() {
 		
 		hexStringToColor: function(hexString) {
 			return new THREE.Color().set(hexString);
+		},
+		
+		addGrid: function(size, worldColor, gridColor) {
+				
+			let zBuff = gfx.appSettings.zBuffer;
+			var planeGeometry = new THREE.PlaneBufferGeometry(size, size);
+			planeGeometry.rotateX(-Math.PI / 2);
+			var planeMaterial = new THREE.ShadowMaterial();
+
+			var plane = new THREE.Mesh(planeGeometry, planeMaterial);
+			plane.position.y = -1;
+			plane.receiveShadow = true;
+			scene.add(plane);
+			var helper = new THREE.GridHelper(size, 20, gridColor, gridColor);
+			helper.material.opacity = .75;
+			helper.material.transparent = true;
+			helper.position.set(zBuff, 0, -zBuff);
+			scene.add(helper);
+			
+			let wall = new THREE.GridHelper(size, 20, gridColor, gridColor);
+			wall.material.opacity = .75;
+			wall.material.transparent = true;
+			
+			let left = wall.clone();
+			left.rotation.x = Math.PI/2;
+			left.position.set(0, size/2, -size/2 - zBuff);
+			scene.add(left);
+			let right = helper.clone();
+			right.rotation.set(Math.PI/2, 0, Math.PI/2);
+			right.position.set(size/2, size/2, -zBuff);
+			scene.add(right);
+			
+			let white = 0xffffff;
+			let bottomLeft = new THREE.Vector3(-size/2, 0, -size/2), nearestCorner = new THREE.Vector3(-size/2, 0, size/2);
+			gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, size, -size/2), white, .5);
+			gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, 0, size/2), white, .5);
+			gfx.drawLineFromPoints(new THREE.Vector3(-size/2, 0, size/2), new THREE.Vector3(size/2, 0, size/2), white, .5);
+
+			scene.background = worldColor;
+			//scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
+			
+			let axisScaleLabelColor = 0xffffff;
+			let count = 10;
+			let length = size;
+			let interval = length/count;
+			let tickLength = 1;
+			let tick = new THREE.Vector3(-tickLength, 0, 0), tickRight = new THREE.Vector3(0, 0, tickLength);
+			for (let i = 0; i < count+ 1; i++) { // y-axis ticks
+				let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*interval, 0));
+				gfx.drawLine(tickOrigin, tick);
+				let label = (i).toString();
+				let offset = new THREE.Vector3(-(interval/10)*label.length - 2, -1, 0);
+				gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor);
+			}
+			for (let i = 0; i < count+ 1; i++) { // z-axis ticks
+				let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, i*interval));
+				gfx.drawLine(tickOrigin, tick);
+				let label = (i).toString();
+				let offset = new THREE.Vector3(-(interval/10)*label.length - 2, -1, 0);
+				gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor);
+			}
+			for (let i = 0; i < count+ 1; i++) { // x-axis ticks
+				let tickOrigin = gfx.movePoint(nearestCorner, new THREE.Vector3(i*interval, 0, 0));
+				gfx.drawLine(tickOrigin, tickRight);
+				let label = (i).toString();
+				let offset = new THREE.Vector3(0, -1, (interval/100)*(label.length) + 2);
+				gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor, new THREE.Vector3(0, -Math.PI / 2, 0));
+			}
+			gfx.labelLarge(new THREE.Vector3(-size/2 - size/20, -size/20, -5), "z-axis", axisScaleLabelColor, new THREE.Vector3(0, -Math.PI / 2, 0));
+			gfx.labelLarge(new THREE.Vector3(-size/2 - ("y-axis".length * size/40) - 2, size/2, -size/2), "y-axis", axisScaleLabelColor);
+			gfx.labelLarge(new THREE.Vector3(-("y-axis".length/2 * size/40), -size/20, size/2 + size/20), "x-axis", axisScaleLabelColor);
+			
+			return plane;
 		}
 	}
 }

@@ -12,7 +12,7 @@ const { Vector3 } = require("three");
 			appSettings: {
 				activateLightHelpers: false,
 				axesHelper: {
-					active: true,
+					active: false,
 					axisLength: 50,
 					axes: null,
 					labels: []
@@ -37,7 +37,6 @@ const { Vector3 } = require("three");
 			},
 
 			activateAxesHelper: function() {
-				console.log('activate');
 				let self = this;
 				gfx.appSettings.axesHelper.axes = new THREE.AxesHelper(gfx.appSettings.axesHelper.axisLength);
 				scene.add(gfx.appSettings.axesHelper.axes);
@@ -47,14 +46,12 @@ const { Vector3 } = require("three");
 			toggleAxesHelper: function() {
 				let self = this;
 				if (gfx.appSettings.axesHelper.active) {
-					console.log('try remove');
 					scene.remove(gfx.appSettings.axesHelper.axes);
 					gfx.appSettings.axesHelper.labels.forEach(function(label) {
 						scene.remove(label);
 					});
 				}
 				else {
-					console.log('try activate');
 					self.activateAxesHelper();
 				}
 				gfx.appSettings.axesHelper.active = !gfx.appSettings.axesHelper.active;
@@ -66,77 +63,6 @@ const { Vector3 } = require("three");
 					let helper = new THREE.DirectionalLightHelper(lights[i], 5, 0x00000);
 					scene.add(helper);
 				}
-			},
-
-			addGrid: function(size, worldColor, gridColor) {
-				
-				let zBuff = gfx.appSettings.zBuffer;
-				var planeGeometry = new THREE.PlaneBufferGeometry(size, size);
-				planeGeometry.rotateX(-Math.PI / 2);
-				var planeMaterial = new THREE.ShadowMaterial();
-	
-				var plane = new THREE.Mesh(planeGeometry, planeMaterial);
-				plane.position.y = -1;
-				plane.receiveShadow = true;
-				scene.add(plane);
-				var helper = new THREE.GridHelper(size, 20, gridColor, gridColor);
-				helper.material.opacity = .75;
-				helper.material.transparent = true;
-				helper.position.set(zBuff, 0, -zBuff);
-				scene.add(helper);
-				
-				let wall = new THREE.GridHelper(size, 20, gridColor, gridColor);
-				wall.material.opacity = .75;
-				wall.material.transparent = true;
-				
-				let left = wall.clone();
-				left.rotation.x = Math.PI/2;
-				left.position.set(0, size/2, -size/2 - zBuff);
-				scene.add(left);
-				let right = helper.clone();
-				right.rotation.set(Math.PI/2, 0, Math.PI/2);
-				right.position.set(size/2, size/2, -zBuff);
-				scene.add(right);
-				
-				let white = 0xffffff;
-				let bottomLeft = new THREE.Vector3(-size/2, 0, -size/2), nearestCorner = new THREE.Vector3(-size/2, 0, size/2);
-				gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, size, -size/2), white, .5);
-				gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, 0, size/2), white, .5);
-				gfx.drawLineFromPoints(new THREE.Vector3(-size/2, 0, size/2), new THREE.Vector3(size/2, 0, size/2), white, .5);
-	
-				scene.background = worldColor;
-				//scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
-				
-				let axisScaleLabelColor = 0xffffff;
-				let count = 10;
-				let length = size;
-				let interval = length/count;
-				let tickLength = 1;
-				let tick = new THREE.Vector3(-tickLength, 0, 0), tickRight = new THREE.Vector3(0, 0, tickLength);
-				for (let i = 0; i < count+ 1; i++) { // y-axis ticks
-					let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*interval, 0));
-					gfx.drawLine(tickOrigin, tick);
-					let label = (i).toString();
-					let offset = new THREE.Vector3(-(interval/10)*label.length - 2, -1, 0);
-					gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor);
-				}
-				for (let i = 0; i < count+ 1; i++) { // z-axis ticks
-					let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, i*interval));
-					gfx.drawLine(tickOrigin, tick);
-					let label = (i).toString();
-					let offset = new THREE.Vector3(-(interval/10)*label.length - 2, -1, 0);
-					gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor);
-				}
-				for (let i = 0; i < count+ 1; i++) { // x-axis ticks
-					let tickOrigin = gfx.movePoint(nearestCorner, new THREE.Vector3(i*interval, 0, 0));
-					gfx.drawLine(tickOrigin, tickRight);
-					let label = (i).toString();
-					let offset = new THREE.Vector3(0, -1, -(interval/10)*label.length + 3);
-					gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor, new THREE.Vector3(0, -Math.PI / 2, 0));
-				}
-				// gfx.labelLarge(new THREE.Vector3(-size, 0, 0), "Really Cool Axis Label Here", new THREE.Vector3(0, Math.PI/2, 0));
-				
-				return plane;
 			},
 			
 			meshSetPosition: function(mesh, position) {
@@ -365,7 +291,6 @@ const { Vector3 } = require("three");
 			},
 
 			labelAxesHelper: function() {
-				console.log('label axes');
 				let self = this;
 				if (gfx.appSettings.font.enable) {
 					gfx.appSettings.axesHelper.labels = [];

@@ -143,7 +143,8 @@ module.exports = function () {
           console.log(camera.position);
         }
 
-        if (event.keyCode === a) {// gfx.toggleAxesHelper();
+        if (event.keyCode === a) {
+          gfx.toggleAxesHelper();
         }
       });
     },
@@ -251,8 +252,10 @@ var _require = require("three"),
       },
       activateAxesHelper: function activateAxesHelper() {
         console.log('activate');
+        var self = this;
         gfx.appSettings.axesHelper.axes = new THREE.AxesHelper(gfx.appSettings.axesHelper.axisLength);
         scene.add(gfx.appSettings.axesHelper.axes);
+        self.labelAxesHelper();
       },
       toggleAxesHelper: function toggleAxesHelper() {
         var self = this;
@@ -558,6 +561,7 @@ var _require = require("three"),
         return Math.sqrt(squirt);
       },
       labelAxesHelper: function labelAxesHelper() {
+        console.log('label axes');
         var self = this;
 
         if (gfx.appSettings.font.enable) {

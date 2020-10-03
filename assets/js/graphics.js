@@ -38,8 +38,10 @@ const { Vector3 } = require("three");
 
 			activateAxesHelper: function() {
 				console.log('activate');
+				let self = this;
 				gfx.appSettings.axesHelper.axes = new THREE.AxesHelper(gfx.appSettings.axesHelper.axisLength);
 				scene.add(gfx.appSettings.axesHelper.axes);
+				self.labelAxesHelper();
 			},
 			
 			toggleAxesHelper: function() {
@@ -363,7 +365,7 @@ const { Vector3 } = require("three");
 			},
 
 			labelAxesHelper: function() {
-			
+				console.log('label axes');
 				let self = this;
 				if (gfx.appSettings.font.enable) {
 					gfx.appSettings.axesHelper.labels = [];

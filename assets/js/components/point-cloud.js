@@ -146,7 +146,7 @@ module.exports = function() {
 					console.log(camera.position);
 				}
 				if (event.keyCode === a) {
-					// gfx.toggleAxesHelper();
+					gfx.toggleAxesHelper();
 				}
 			});
 		},

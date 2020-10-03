@@ -96,9 +96,10 @@ module.exports = function () {
       fontPath = 'assets/vendors/js/three.js/examples/fonts/helvetiker_regular.typeface.json';
       loader.load(fontPath, function (font) {
         // success event
-        gfx.appSettings.font.fontStyle.font = font;
+        gfx.appSettings.font.smallFont.font = font;
+        gfx.appSettings.font.largeFont.font = font;
         self.begin();
-        if (gfx.appSettings.axesHelper.activateAxesHelper) gfx.labelAxes();
+        if (gfx.appSettings.axesHelper.activateAxesHelper) gfx.labelAxesHelper();
       }, function (event) {}, // in progress event
       function (event) {
         // error event
@@ -116,6 +117,7 @@ module.exports = function () {
         var four = 52;
         var r = 82;
         var space = 32;
+        var a = 65;
 
         if (event.keyCode === one) {
           self.reset();
@@ -139,6 +141,9 @@ module.exports = function () {
 
         if (event.keyCode === space) {
           console.log(camera.position);
+        }
+
+        if (event.keyCode === a) {// gfx.toggleAxesHelper();
         }
       });
     },
@@ -221,14 +226,22 @@ var _require = require("three"),
       appSettings: {
         activateLightHelpers: false,
         axesHelper: {
-          activateAxesHelper: false,
-          axisLength: 50
+          active: true,
+          axisLength: 50,
+          axes: null,
+          labels: []
         },
         font: {
           enable: true,
-          fontStyle: {
+          smallFont: {
             font: null,
-            size: 5,
+            size: 1.5,
+            height: 0,
+            curveSegments: 1
+          },
+          largeFont: {
+            font: null,
+            size: 3,
             height: 0,
             curveSegments: 1
           }
@@ -237,9 +250,25 @@ var _require = require("three"),
         errorLogging: false
       },
       activateAxesHelper: function activateAxesHelper() {
+        console.log('activate');
+        gfx.appSettings.axesHelper.axes = new THREE.AxesHelper(gfx.appSettings.axesHelper.axisLength);
+        scene.add(gfx.appSettings.axesHelper.axes);
+      },
+      toggleAxesHelper: function toggleAxesHelper() {
         var self = this;
-        var axesHelper = new THREE.AxesHelper(gfx.appSettings.axesHelper.axisLength);
-        scene.add(axesHelper);
+
+        if (gfx.appSettings.axesHelper.active) {
+          console.log('try remove');
+          scene.remove(gfx.appSettings.axesHelper.axes);
+          gfx.appSettings.axesHelper.labels.forEach(function (label) {
+            scene.remove(label);
+          });
+        } else {
+          console.log('try activate');
+          self.activateAxesHelper();
+        }
+
+        gfx.appSettings.axesHelper.active = !gfx.appSettings.axesHelper.active;
       },
       activateLightHelpers: function activateLightHelpers(lights) {
         for (var i = 0; i < lights.length; i++) {
@@ -280,33 +309,54 @@ var _require = require("three"),
         gfx.drawLineFromPoints(new THREE.Vector3(-size / 2, 0, size / 2), new THREE.Vector3(size / 2, 0, size / 2), white, .5);
         scene.background = worldColor; //scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
 
+        var axisScaleLabelColor = 0xffffff;
         var count = 10;
         var length = size;
+        var interval = length / count;
         var tickLength = 1;
         var tick = new THREE.Vector3(-tickLength, 0, 0),
             tickRight = new THREE.Vector3(0, 0, tickLength);
 
         for (var i = 0; i < count + 1; i++) {
           // y-axis ticks
-          var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i * (length / count), 0));
+          var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i * interval, 0));
           gfx.drawLine(tickOrigin, tick);
+          var label = i.toString();
+          var offset = new THREE.Vector3(-(interval / 10) * label.length - 2, -1, 0);
+          gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor);
         }
 
         for (var _i = 0; _i < count + 1; _i++) {
           // z-axis ticks
-          var _tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, _i * (length / count)));
+          var _tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, _i * interval));
 
           gfx.drawLine(_tickOrigin, tick);
+
+          var _label = _i.toString();
+
+          var _offset = new THREE.Vector3(-(interval / 10) * _label.length - 2, -1, 0);
+
+          gfx.labelPoint(gfx.movePoint(_tickOrigin, _offset), _label, axisScaleLabelColor);
         }
 
         for (var _i2 = 0; _i2 < count + 1; _i2++) {
           // x-axis ticks
-          var _tickOrigin2 = gfx.movePoint(nearestCorner, new THREE.Vector3(_i2 * (length / count), 0, 0));
+          var _tickOrigin2 = gfx.movePoint(nearestCorner, new THREE.Vector3(_i2 * interval, 0, 0));
 
           gfx.drawLine(_tickOrigin2, tickRight);
-        }
+
+          var _label2 = _i2.toString();
+
+          var _offset2 = new THREE.Vector3(0, -1, -(interval / 10) * _label2.length + 3);
+
+          gfx.labelPoint(gfx.movePoint(_tickOrigin2, _offset2), _label2, axisScaleLabelColor, new THREE.Vector3(0, -Math.PI / 2, 0));
+        } // gfx.labelLarge(new THREE.Vector3(-size, 0, 0), "Really Cool Axis Label Here", new THREE.Vector3(0, Math.PI/2, 0));
+
 
         return plane;
+      },
+      meshSetPosition: function meshSetPosition(mesh, position) {
+        mesh.position.set(position.x, position.y, position.z);
       },
       createVector: function createVector(pt1, pt2) {
         return new THREE.Vector3(pt2.x - pt1.x, pt2.y - pt1.y, pt2.z - pt1.z);
@@ -379,7 +429,7 @@ var _require = require("three"),
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf0f0f0);
 
-        if (gfx.appSettings.axesHelper.activateAxesHelper) {
+        if (gfx.appSettings.axesHelper.active) {
           gfx.activateAxesHelper();
         }
 
@@ -438,17 +488,38 @@ var _require = require("three"),
       },
 
       /* 	Inputs: pt - point in space to label, in the form of object with x, y, and z properties; label - text content for label; color - optional */
-      labelPoint: function labelPoint(pt, label, color) {
+      labelPoint: function labelPoint(pt, label, color, rotation) {
+        rotation = rotation || new THREE.Vector3(0, 0, 0);
         var self = this;
 
         if (gfx.appSettings.font.enable) {
           color = color || 0xff0000;
-          var textGeometry = new THREE.TextGeometry(label, self.appSettings.font.fontStyle);
+          var textGeometry = new THREE.TextGeometry(label, self.appSettings.font.smallFont);
           var textMaterial = new THREE.MeshBasicMaterial({
             color: color
           });
           var mesh = new THREE.Mesh(textGeometry, textMaterial);
-          textGeometry.rotateX(-Math.PI / 2);
+          textGeometry.rotateX(rotation.x);
+          textGeometry.rotateY(rotation.y);
+          textGeometry.rotateZ(rotation.z);
+          textGeometry.translate(pt.x, pt.y, pt.z);
+          scene.add(mesh);
+        }
+      },
+      labelLarge: function labelLarge(pt, label, color, rotation) {
+        rotation = rotation || new THREE.Vector3(0, 0, 0);
+        var self = this;
+
+        if (gfx.appSettings.font.enable) {
+          color = color || 0xff0000;
+          var textGeometry = new THREE.TextGeometry(label, self.appSettings.font.largeFont);
+          var textMaterial = new THREE.MeshBasicMaterial({
+            color: color
+          });
+          var mesh = new THREE.Mesh(textGeometry, textMaterial);
+          textGeometry.rotateX(rotation.x);
+          textGeometry.rotateY(rotation.y);
+          textGeometry.rotateZ(rotation.z);
           textGeometry.translate(pt.x, pt.y, pt.z);
           scene.add(mesh);
         }
@@ -486,31 +557,35 @@ var _require = require("three"),
         var squirt = Math.pow(pt2.x - pt1.x, 2) + Math.pow(pt2.y - pt1.y, 2) + Math.pow(pt2.z - pt1.z, 2);
         return Math.sqrt(squirt);
       },
-      labelAxes: function labelAxes() {
+      labelAxesHelper: function labelAxesHelper() {
         var self = this;
 
         if (gfx.appSettings.font.enable) {
-          var textGeometry = new THREE.TextGeometry('Y', gfx.appSettings.font.fontStyle);
+          gfx.appSettings.axesHelper.labels = [];
+          var textGeometry = new THREE.TextGeometry('Y', gfx.appSettings.font.largeFont);
           var textMaterial = new THREE.MeshBasicMaterial({
             color: 0x00ff00
           });
           var mesh = new THREE.Mesh(textGeometry, textMaterial);
           textGeometry.translate(0, gfx.appSettings.axesHelper.axisLength, 0);
           scene.add(mesh);
-          textGeometry = new THREE.TextGeometry('X', gfx.appSettings.font.fontStyle);
+          gfx.appSettings.axesHelper.labels.push(mesh);
+          textGeometry = new THREE.TextGeometry('X', gfx.appSettings.font.largeFont);
           textMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000
           });
           mesh = new THREE.Mesh(textGeometry, textMaterial);
           textGeometry.translate(gfx.appSettings.axesHelper.axisLength, 0, 0);
           scene.add(mesh);
-          textGeometry = new THREE.TextGeometry('Z', gfx.appSettings.font.fontStyle);
+          gfx.appSettings.axesHelper.labels.push(mesh);
+          textGeometry = new THREE.TextGeometry('Z', gfx.appSettings.font.largeFont);
           textMaterial = new THREE.MeshBasicMaterial({
             color: 0x0000ff
           });
           mesh = new THREE.Mesh(textGeometry, textMaterial);
           textGeometry.translate(0, 0, gfx.appSettings.axesHelper.axisLength);
           scene.add(mesh);
+          gfx.appSettings.axesHelper.labels.push(mesh);
         }
       },
       setCameraLocation: function setCameraLocation(camera, pt) {

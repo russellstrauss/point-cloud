@@ -102,9 +102,10 @@ module.exports = function() {
 
 			loader.load(fontPath, function(font) { // success event
 				
-				gfx.appSettings.font.fontStyle.font = font;
+				gfx.appSettings.font.smallFont.font = font;
+				gfx.appSettings.font.largeFont.font = font;
 				self.begin();
-				if (gfx.appSettings.axesHelper.activateAxesHelper) gfx.labelAxes();
+				if (gfx.appSettings.axesHelper.activateAxesHelper) gfx.labelAxesHelper();
 			},
 			function(event) {}, // in progress event
 			function(event) { // error event
@@ -124,6 +125,7 @@ module.exports = function() {
 				let four = 52;
 				let r = 82;
 				let space = 32;
+				let a = 65;
 				
 				if (event.keyCode === one) {
 					self.reset();
@@ -142,6 +144,9 @@ module.exports = function() {
 				}
 				if (event.keyCode === space) {
 					console.log(camera.position);
+				}
+				if (event.keyCode === a) {
+					// gfx.toggleAxesHelper();
 				}
 			});
 		},

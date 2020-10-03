@@ -1,6 +1,6 @@
 # Vector Fields
 
-Visualizing Vector Fields
+Point Cloud
 
 ## Authors
 
@@ -43,8 +43,6 @@ gulp
 
 ### Controls
 
-
-
 ## Deployment
 
 <!-- If you cannot run local web server, view project here: [http://jrstrauss.net/cg/tetrobot/](http://jrstrauss.net/cg/tetrobot/) -->
@@ -52,9 +50,3 @@ gulp
 ## Built With
 
 * [Three.js](https://threejs.org/) - The WebGL JavaScript graphics framework
-
-## Reference Materials
-* [Determining if a point lies on the interior of a polygon](http://www.eecs.umich.edu/courses/eecs380/HANDOUTS/PROJ2/InsidePoly.html) - Determining if a point lies on the interior of a polygon written by Paul Bourke, outlining multiple algorithms for determining if a point lies within a polygon.
-
-
-

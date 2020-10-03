@@ -155,24 +155,37 @@ module.exports = function() {
 			
 			let self = this;
 			let loader = new THREE.OBJLoader();
-			loader.load('./assets/obj/bunny.obj',
+			let file = './assets/obj/bunny.obj';
+			loader.load(file,
 				function (obj) { // loaded
 					
+					camera.position.set(-80, 100, 100);
 					let geometry = obj.children[0].geometry;
-					
-					let color1 = new THREE.Color(1, 0, 0);
-					let color2 = new THREE.Color(0, 1, 0);
-					
+					let material = new THREE.PointsMaterial({size: (1/3), vertexColors: THREE.VertexColors });
+					let mesh = new THREE.Points(geometry, material);
 					let colors = [];
-					let vertexCount = geometry.attributes.position.count;
-					for (let i = 0; i < vertexCount; i++) {
-						let interpolator = (i/(vertexCount - 1));
-						// colors[i] = color1.clone().lerp(color2, interpolator);
-						colors[i] = self.rgbStringToColor(d3.interpolateYlGnBu(interpolator));
+					let color1 = new THREE.Color(0, 0, 1);
+					let color2 = new THREE.Color(1, 1, 0);
+					let interps = [d3.interpolateRainbow, d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu,d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn]
+					let colorSchemes = [d3.schemeCategory10, d3.schemeAccent, d3.schemeDark2, d3.schemePaired, d3.schemePastel1, d3.schemePastel2, d3.schemeSet1, d3.schemeSet2, d3.schemeSet3, d3.schemeTableau10];
+					switch (file) {
+						case './assets/obj/teapot.obj':
+							mesh.scale.set(15, 15, 15);
+							// colors = self.interpolateColors(geometry, color1, color2);
+							// colors = self.interpolateD3Colors(geometry, color1, color2, interps[10], true);
+							colors = self.d3Stripes(geometry, colorSchemes[9]);
+							break;
+						case './assets/obj/bunny.obj':
+							mesh.scale.set(500, 500, 500);
+							mesh.position.y -= 16.5; mesh.position.x += 10;
+							// colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateYlGnBu, true);
+							// colors = self.interpolateD3Colors(geometry, color1, color2, interps[1], true);
+							colors = self.d3Stripes(geometry, colorSchemes[6]);
+							break;
 					}
-					let reverseColors = true;
-					if (reverseColors) colors.reverse();
 					
+					
+					let vertexCount = geometry.attributes.position.count;
 					let arrayBuffer = new ArrayBuffer( vertexCount * 16 ); // create a generic buffer of binary data (a single particle has 16 bytes of data)
 					let interleavedFloat32Buffer = new Float32Array( arrayBuffer );// the typed arrays share the same buffer
 					let interleavedUint8Buffer = new Uint8Array( arrayBuffer );
@@ -190,12 +203,6 @@ module.exports = function() {
 					let interleavedBuffer32 = new THREE.InterleavedBuffer(interleavedFloat32Buffer, 4), interleavedBuffer8 = new THREE.InterleavedBuffer( interleavedUint8Buffer, 16);
 					geometry.setAttribute( 'color', new THREE.InterleavedBufferAttribute( interleavedBuffer8, 3, 12, true));
 					
-					camera.position.set(-80, 100, 100);
-					let material = new THREE.PointsMaterial({size: (1/3), vertexColors: THREE.VertexColors });
-					let mesh = new THREE.Points(geometry, material);
-					// bunny
-					mesh.scale.set(500, 500, 500);
-					mesh.position.y -= 16.5; mesh.position.x += 10;
 					scene.add(mesh)
 				},
 				function (xhr) { // in progress
@@ -204,6 +211,45 @@ module.exports = function() {
 					console.log('Error loadModel(): ', error);
 				}
 			);
+		},
+		
+		d3Stripes: function(geometry, colorScheme) {
+			let self = this;
+			let colors = [];
+			let vertexCount = geometry.attributes.position.count;
+			for (let i = 0; i < vertexCount; i++) {
+				let interpolator = (i/(vertexCount - 1));
+				console.log(Math.floor(interpolator*10), colorScheme[Math.floor(interpolator*10)]);
+				colors[i] = self.hexStringToColor(colorScheme[i%colorScheme.length]);
+			}
+			return colors;
+		},
+		
+		interpolateD3Colors: function(geometry, color1, color2, interpolatorFunc, reverse) {
+			let self = this;
+			reverse = reverse || false;
+			let colors = [];
+			let vertexCount = geometry.attributes.position.count;
+			for (let i = 0; i < vertexCount; i++) {
+				let interpolator = (i/(vertexCount - 1));
+				// colors[i] = color1.clone().lerp(color2, interpolator);
+				colors[i] = self.rgbStringToColor(interpolatorFunc(interpolator));
+			}
+			if (reverse) colors.reverse();
+			return colors;
+		},
+		
+		interpolateColors: function(geometry, color1, color2, reverse) {
+			let self = this;
+			reverse = reverse || false;
+			let colors = [];
+			let vertexCount = geometry.attributes.position.count;
+			for (let i = 0; i < vertexCount; i++) {
+				let interpolator = (i/(vertexCount - 1));
+				colors[i] = color1.clone().lerp(color2, interpolator);
+			}
+			if (reverse) colors.reverse();
+			return colors;
 		},
 		
 		rgbStringToColor: function(rgbString) {

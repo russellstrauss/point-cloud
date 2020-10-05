@@ -3,18 +3,24 @@
 
 module.exports = function () {
   var message = document.querySelector('.message');
+  var pastData;
   var settings = {
     defaultCameraLocation: {
-      x: 0,
-      y: 75,
-      z: 0
+      x: -90,
+      y: 110,
+      z: 80
     },
     messageDuration: 2000,
     colors: {
       worldColor: new THREE.Color('#000'),
       gridColor: new THREE.Color('#111')
     },
-    gridSize: 100
+    gridSize: 100,
+    axes: {
+      color: 0xffffff,
+      count: 20,
+      tickLength: 1
+    }
   };
   var renderer, scene, camera, controls, floor;
   var raycaster = new THREE.Raycaster();
@@ -27,6 +33,7 @@ module.exports = function () {
     init: function init() {
       var self = this;
       self.loadFont();
+      self.loadData();
     },
     begin: function begin() {
       var self = this;
@@ -39,8 +46,7 @@ module.exports = function () {
       gfx.setUpLights();
       gfx.setCameraLocation(camera, settings.defaultCameraLocation);
       self.addStars();
-      self.setUpButtons();
-      self.addVertexColors();
+      self.setUpButtons(); // self.addVertexColors();
 
       var animate = function animate() {
         requestAnimationFrame(animate);
@@ -140,7 +146,7 @@ module.exports = function () {
         }
 
         if (event.keyCode === space) {
-          console.log(camera.position);
+          console.log(camera);
         }
 
         if (event.keyCode === a) {
@@ -154,7 +160,6 @@ module.exports = function () {
       var file = './assets/obj/bunny.obj';
       loader.load(file, function (obj) {
         // loaded
-        camera.position.set(-80, 100, 100);
         var geometry = obj.children[0].geometry;
         var material = new THREE.PointsMaterial({
           size: 1 / 3,
@@ -218,8 +223,8 @@ module.exports = function () {
       var vertexCount = geometry.attributes.position.count;
 
       for (var i = 0; i < vertexCount; i++) {
-        var interpolator = i / (vertexCount - 1);
-        console.log(Math.floor(interpolator * 10), colorScheme[Math.floor(interpolator * 10)]);
+        var interpolator = i / (vertexCount - 1); // console.log(Math.floor(interpolator*10), colorScheme[Math.floor(interpolator*10)]);
+
         colors[i] = self.hexStringToColor(colorScheme[i % colorScheme.length]);
       }
 
@@ -295,52 +300,101 @@ module.exports = function () {
       scene.background = worldColor; //scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
 
       var axisScaleLabelColor = 0xffffff;
-      var count = 10;
-      var length = size;
+      var count = settings.axes.count;
+      var length = settings.gridSize;
       var interval = length / count;
-      var tickLength = 1;
+      var tickLength = settings.axes.tickLength;
       var tick = new THREE.Vector3(-tickLength, 0, 0),
           tickRight = new THREE.Vector3(0, 0, tickLength);
 
-      for (var i = 0; i < count + 1; i++) {
-        // y-axis ticks
-        var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i * interval, 0));
+      for (var i = 2; i < count + 1; i += 2) {
+        // z-axis ticks
+        var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, i * interval));
         gfx.drawLine(tickOrigin, tick);
         var label = i.toString();
-        var offset = new THREE.Vector3(-(interval / 10) * label.length - 2, -1, 0);
-        gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, axisScaleLabelColor);
+        var offset = new THREE.Vector3(-(interval / 8) * (label.length + 1) - 2, -1, 0);
+        gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
       }
 
-      for (var _i = 0; _i < count + 1; _i++) {
-        // z-axis ticks
-        var _tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, _i * interval));
+      for (var _i = 0; _i < count + 1; _i += 2) {
+        // x-axis ticks
+        var _tickOrigin = gfx.movePoint(nearestCorner, new THREE.Vector3(_i * interval, 0, 0));
 
-        gfx.drawLine(_tickOrigin, tick);
+        gfx.drawLine(_tickOrigin, tickRight);
 
         var _label = _i.toString();
 
-        var _offset = new THREE.Vector3(-(interval / 10) * _label.length - 2, -1, 0);
+        var _offset = new THREE.Vector3(0, -1, interval / 100 * _label.length + 2);
 
-        gfx.labelPoint(gfx.movePoint(_tickOrigin, _offset), _label, axisScaleLabelColor);
+        gfx.labelPoint(gfx.movePoint(_tickOrigin, _offset), _label, settings.axes.color, new THREE.Vector3(0, 0, 0));
       }
 
-      for (var _i2 = 0; _i2 < count + 1; _i2++) {
-        // x-axis ticks
-        var _tickOrigin2 = gfx.movePoint(nearestCorner, new THREE.Vector3(_i2 * interval, 0, 0));
-
-        gfx.drawLine(_tickOrigin2, tickRight);
-
-        var _label2 = _i2.toString();
-
-        var _offset2 = new THREE.Vector3(0, -1, interval / 100 * _label2.length + 2);
-
-        gfx.labelPoint(gfx.movePoint(_tickOrigin2, _offset2), _label2, axisScaleLabelColor, new THREE.Vector3(0, -Math.PI / 2, 0));
-      }
-
-      gfx.labelLarge(new THREE.Vector3(-size / 2 - size / 20, -size / 20, -5), "z-axis", axisScaleLabelColor, new THREE.Vector3(0, -Math.PI / 2, 0));
-      gfx.labelLarge(new THREE.Vector3(-size / 2 - "y-axis".length * size / 40 - 2, size / 2, -size / 2), "y-axis", axisScaleLabelColor);
-      gfx.labelLarge(new THREE.Vector3(-("y-axis".length / 2 * size / 40), -size / 20, size / 2 + size / 20), "x-axis", axisScaleLabelColor);
+      gfx.labelLarge(new THREE.Vector3(-size / 2 - size / 20, -size / 20, -5), "z-axis", settings.axes.color, new THREE.Vector3(0, -Math.PI / 2, 0));
+      gfx.labelLarge(new THREE.Vector3(-("x-axis".length / 2 * size / 40), -size / 20, size / 2 + size / 20), "x-axis", settings.axes.color);
       return plane;
+    },
+    loadData: function loadData() {
+      var self = this;
+      var dataset = pastData;
+
+      var preparePast = function preparePast(d, i) {
+        var row = {};
+        row.year = d['Year'];
+        row.amount = d['Global plastics production (million tons)'];
+        return row;
+      };
+
+      d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function (data1) {
+        pastData = data1;
+        self.lineChart();
+        var length = settings.gridSize;
+        var size = settings.gridSize;
+        var interval = length / settings.axes.count;
+        var bottomLeft = new THREE.Vector3(-size / 2, 0, -size / 2),
+            nearestCorner = new THREE.Vector3(-size / 2, 0, size / 2);
+        var axisScaleLabelColor = 0xffffff;
+        var count = settings.axes.count;
+        var tickLength = settings.axes.tickLength;
+        var tick = new THREE.Vector3(-tickLength, 0, 0),
+            tickRight = new THREE.Vector3(0, 0, tickLength);
+        var maxValue = d3.max(data1, function (d) {
+          return +d.amount;
+        });
+        var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]);
+        var label = "production";
+        var charWidth = size / 50;
+        gfx.labelLarge(new THREE.Vector3(-size / 2 - label.length * charWidth - maxValue.toString().length * charWidth - 3, size / 2, -size / 2), label, 0xffffff);
+
+        for (var i = 0; i < count + 1; i += 2) {
+          // y-axis ticks
+          var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i * interval, 0));
+          gfx.drawLine(tickOrigin, tick);
+
+          var _label2 = maxValue / 20 * i;
+
+          if (_label2 > 1000000) _label2 = _label2.toExponential();
+          _label2 = _label2.toString();
+          var offset = new THREE.Vector3(-(interval / 4) * (_label2.length + 1), -1, 0);
+          gfx.labelPoint(gfx.movePoint(tickOrigin, offset), _label2, settings.axes.color);
+        }
+      });
+    },
+    lineChart: function lineChart() {
+      var self = this;
+      var dataset = pastData;
+      var offset = settings.gridSize / 2;
+      var xScale = d3.scaleLinear().domain([1950, 2015]).range([-offset, settings.gridSize - offset]);
+      var maxValue = d3.max(dataset, function (d) {
+        return +d.amount;
+      });
+      var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]);
+      var prevPoint = null;
+      dataset.forEach(function (row, index) {
+        var currentPoint = gfx.showPoint(new THREE.Vector3(xScale(row.year), yScale(row.amount), xScale(row.year)), red, 4, .5);
+        if (prevPoint !== null) gfx.drawLineFromPoints(prevPoint, currentPoint, white, .75);
+        prevPoint = currentPoint;
+        gfx.drawLineFromPoints(new THREE.Vector3(currentPoint.x, 0, currentPoint.z), currentPoint, white, .15); // add pretty vertical lines
+      });
     }
   };
 };
@@ -504,13 +558,13 @@ var _require = require("three"),
           gfx.showPoint(geometry.vertices[i], color, opacity);
         }
       },
-      showPoint: function showPoint(pt, color, opacity) {
+      showPoint: function showPoint(pt, color, size, opacity) {
         color = color || 0xff0000;
         opacity = opacity || 1;
         var dotGeometry = new THREE.Geometry();
-        dotGeometry.vertices.push(new THREE.Vector3(pt.x, pt.y, pt.z));
+        dotGeometry.vertices.push(pt);
         var dotMaterial = new THREE.PointsMaterial({
-          size: 10,
+          size: size,
           sizeAttenuation: false,
           color: color,
           opacity: opacity,
@@ -518,7 +572,7 @@ var _require = require("three"),
         });
         var dot = new THREE.Points(dotGeometry, dotMaterial);
         scene.add(dot);
-        return dot;
+        return pt;
       },
       showVector: function showVector(vector, origin, color) {
         var arrowHelper;
@@ -643,9 +697,7 @@ var _require = require("three"),
         }
       },
       setCameraLocation: function setCameraLocation(camera, pt) {
-        camera.position.x = pt.x;
-        camera.position.y = pt.y;
-        camera.position.z = pt.z;
+        camera.position.set(pt.x, pt.y, pt.z);
       },
       resizeRendererOnWindowResize: function resizeRendererOnWindowResize(renderer, camera) {
         window.addEventListener('resize', utils.debounce(function () {

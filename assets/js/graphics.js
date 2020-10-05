@@ -181,13 +181,13 @@ const { Vector3 } = require("three");
 				}
 			},
 
-			showPoint: function(pt, color, opacity) {
+			showPoint: function(pt, color, size, opacity) {
 				color = color || 0xff0000;
 				opacity = opacity || 1;
 				let dotGeometry = new THREE.Geometry();
-				dotGeometry.vertices.push(new THREE.Vector3(pt.x, pt.y, pt.z));
+				dotGeometry.vertices.push(pt);
 				let dotMaterial = new THREE.PointsMaterial({ 
-					size: 10,
+					size: size,
 					sizeAttenuation: false,
 					color: color,
 					opacity: opacity,
@@ -196,7 +196,7 @@ const { Vector3 } = require("three");
 				let dot = new THREE.Points(dotGeometry, dotMaterial);
 				scene.add(dot);
 				
-				return dot;
+				return pt;
 			},
 
 			showVector: function(vector, origin, color) {
@@ -319,9 +319,7 @@ const { Vector3 } = require("three");
 			},
 
 			setCameraLocation: function(camera, pt) {
-				camera.position.x = pt.x;
-				camera.position.y = pt.y;
-				camera.position.z = pt.z;
+				camera.position.set(pt.x, pt.y, pt.z);
 			},
 
 			resizeRendererOnWindowResize: function(renderer, camera) {

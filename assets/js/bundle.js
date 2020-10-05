@@ -27,8 +27,11 @@ module.exports = function () {
   var black = new THREE.Color('black'),
       white = new THREE.Color('white'),
       green = new THREE.Color(0x00ff00),
-      red = new THREE.Color('#ED0000');
+      red = new THREE.Color('#ED0000'),
+      blue = new THREE.Color(0x0000ff);
   var stats = new Stats();
+  var interps = [d3.interpolateRainbow, d3.interpolateRgb("#450F66", "#B36002"), d3.interpolateRgb("white", "red"), d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu, d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn];
+  var colorSchemes = [d3.schemeCategory10, d3.schemeAccent, d3.schemeDark2, d3.schemePaired, d3.schemePastel1, d3.schemePastel2, d3.schemeSet1, d3.schemeSet2, d3.schemeSet3, d3.schemeTableau10];
   return {
     init: function init() {
       var self = this;
@@ -169,8 +172,6 @@ module.exports = function () {
         var colors = [];
         var color1 = new THREE.Color(0, 0, 1);
         var color2 = new THREE.Color(1, 1, 0);
-        var interps = [d3.interpolateRainbow, d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu, d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn];
-        var colorSchemes = [d3.schemeCategory10, d3.schemeAccent, d3.schemeDark2, d3.schemePaired, d3.schemePastel1, d3.schemePastel2, d3.schemeSet1, d3.schemeSet2, d3.schemeSet3, d3.schemeTableau10];
 
         switch (file) {
           case './assets/obj/teapot.obj':
@@ -388,13 +389,57 @@ module.exports = function () {
         return +d.amount;
       });
       var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]);
-      var prevPoint = null;
+      var prevPoint = null,
+          prevXYProjection = null,
+          prevZYProjection = null;
       dataset.forEach(function (row, index) {
-        var currentPoint = gfx.showPoint(new THREE.Vector3(xScale(row.year), yScale(row.amount), xScale(row.year)), red, 4, .5);
-        if (prevPoint !== null) gfx.drawLineFromPoints(prevPoint, currentPoint, white, .75);
-        prevPoint = currentPoint;
-        gfx.drawLineFromPoints(new THREE.Vector3(currentPoint.x, 0, currentPoint.z), currentPoint, white, .15); // add pretty vertical lines
+        var colorScheme = d3.interpolateRdBu;
+        colorScheme = [d3.interpolateRainbow, d3.interpolateRgb("#450F66", "#B36002"), d3.interpolateRdBu];
+        var color = self.ramp(interps[2], index, dataset.length);
+        var currentPoint = new THREE.Vector3(xScale(row.year), yScale(row.amount), xScale(row.year)); // gfx.showPoint(currentPoint, white, 4, .5);
+
+        var fillLineChart = false;
+        if (prevPoint !== null) gfx.drawLineFromPoints(prevPoint, currentPoint, color, 1);
+
+        if (prevPoint !== null && fillLineChart) {
+          var fillGeometry = new THREE.Geometry();
+          fillGeometry.vertices.push(new THREE.Vector3(prevPoint.x, 0, prevPoint.z), new THREE.Vector3(prevPoint.x, prevPoint.y, prevPoint.z), new THREE.Vector3(currentPoint.x, currentPoint.y, currentPoint.z), new THREE.Vector3(currentPoint.x, 0, currentPoint.z));
+          fillGeometry.faces.push(new THREE.Face3(0, 1, 2));
+          fillGeometry.faces.push(new THREE.Face3(2, 3, 0));
+          var material = new THREE.MeshBasicMaterial({
+            color: color,
+            side: THREE.DoubleSide
+          });
+          var mesh = new THREE.Mesh(fillGeometry, material);
+          scene.add(mesh);
+        }
+
+        prevPoint = currentPoint; //gfx.drawLineFromPoints(new THREE.Vector3(currentPoint.x, 0, currentPoint.z), currentPoint, color, .1); // add pretty vertical lines
+
+        var enableXYProjection = true;
+
+        if (enableXYProjection) {
+          var xyProjection = new THREE.Vector3(currentPoint.x, currentPoint.y, 0 - settings.gridSize / 2);
+          gfx.drawLineFromPoints(xyProjection, currentPoint, white, .05); // y-value indicators
+
+          if (prevXYProjection !== null) gfx.drawLineFromPoints(prevXYProjection, xyProjection, red, 1);
+          prevXYProjection = xyProjection;
+        }
+
+        var enableZYProjection = false;
+
+        if (enableZYProjection) {
+          var zyProjection = new THREE.Vector3(settings.gridSize / 2, currentPoint.y, currentPoint.z);
+          gfx.drawLineFromPoints(zyProjection, currentPoint, white, .1); // y-value indicators
+
+          if (prevZYProjection !== null) gfx.drawLineFromPoints(prevZYProjection, zyProjection, blue, .5);
+          prevZYProjection = zyProjection;
+        }
       });
+    },
+    ramp: function ramp(color, index, total) {
+      // pass a color interpolator or array of colors. will return a color based on percentage index / total
+      return color(index / (total - 1));
     }
   };
 };
@@ -652,7 +697,12 @@ var _require = require("three"),
         var material = new THREE.LineBasicMaterial({
           color: color,
           opacity: alpha,
-          transparent: true
+          transparent: true,
+          linewidth: 100,
+          linecap: 'round',
+          //ignored by WebGLRenderer
+          linejoin: 'round' //ignored by WebGLRenderer
+
         });
         var geometry = new THREE.Geometry();
         geometry.vertices.push(new THREE.Vector3(pt1.x, pt1.y, pt1.z));

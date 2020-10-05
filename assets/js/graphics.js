@@ -274,7 +274,10 @@ const { Vector3 } = require("three");
 				let material = new THREE.LineBasicMaterial({
 					color: color,
 					opacity: alpha,
-					transparent: true
+					transparent: true,
+					linewidth: 100,
+					linecap: 'round', //ignored by WebGLRenderer
+					linejoin:  'round' //ignored by WebGLRenderer
 				});
 				let geometry = new THREE.Geometry();
 				geometry.vertices.push(new THREE.Vector3(pt1.x, pt1.y, pt1.z));

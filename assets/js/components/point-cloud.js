@@ -1,3 +1,5 @@
+const { Vector3 } = require("three");
+
 module.exports = function() {
 	
 	let message = document.querySelector('.message');
@@ -21,8 +23,11 @@ module.exports = function() {
 		}
 	};
 	
+	var uniqueCountries = []; // whiskey
+	var colors = ['red', 'blue', 'green', 'white', 'purple', 'pink', 'orange', '#710C96']; // whiskey
+	
 	var renderer, scene, camera, controls, floor;
-	var raycaster = new THREE.Raycaster();
+	var targetList = [];
 	var black = new THREE.Color('black'), white = new THREE.Color('white'), green = new THREE.Color(0x00ff00), red = new THREE.Color('#ED0000'), blue = new THREE.Color(0x0000ff);
 	var stats = new Stats();
 	
@@ -158,6 +163,28 @@ module.exports = function() {
 					gfx.toggleAxesHelper();
 				}
 			});
+			
+			window.russells_magical_mouse = new THREE.Vector2();
+			let onMouseMove = function(event) {
+				window.russells_magical_mouse.x = ( (event.clientX - renderer.domElement.offsetLeft) / renderer.domElement.width ) * 2 - 1;
+				window.russells_magical_mouse.y = -( (event.clientY - renderer.domElement.offsetTop) / renderer.domElement.height ) * 2 + 1;
+			};
+			window.addEventListener('mousemove', onMouseMove, false);
+			
+			document.querySelector('canvas').addEventListener('click', function(event) {
+				let clickedItems = gfx.intersects(event, camera, targetList);
+				if (clickedItems != null) self.handleClicks(clickedItems);
+			});
+		},
+		
+		handleClicks: function(clickedItems) {
+			let closestMesh = clickedItems[0].object;
+			let line = new Vector3(0, 25, 0);
+
+			gfx.drawLine(closestMesh.position, line, white, .75);
+			let labelPos = line.add(new Vector3(-2, 1, 0));
+			console.log(labelPos);
+			gfx.labelPoint(gfx.movePoint(closestMesh.position, labelPos), 'label', settings.axes.color);
 		},
 		
 		addVertexColors: function() {
@@ -348,7 +375,8 @@ module.exports = function() {
 				
 			d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function(data1) {
 				pastData = data1;
-				self.lineChart();
+				// self.lineChart();
+				self.bubbleChart();
 				let length = settings.gridSize;
 				let size = settings.gridSize;
 				let interval = length/settings.axes.count;
@@ -437,8 +465,62 @@ module.exports = function() {
 			
 		},
 		
+		bubbleChart: function() {
+			
+			let self = this;
+			d3.csv('./assets/data/whiskeys.csv', self.preprocessWhiskey).then(function(dataset) {
+
+				let maxRadius = 6.5;
+				
+				let price = d3.extent(dataset, function(d) { return +d['price']; });
+				let age = d3.extent(dataset, function(d) { return +d['age']; });
+				let rating = d3.extent(dataset, function(d) { return d.rating; });
+
+				let xScale = d3.scaleLinear().domain(age).range([-settings.gridSize/2 + maxRadius, settings.gridSize/2 - maxRadius]);
+				let yScale = d3.scaleLinear().domain(rating).range([settings.gridSize - maxRadius, maxRadius]);
+				let zScale = d3.scaleLinear().domain(price).range([-settings.gridSize/2 + maxRadius, settings.gridSize/2 - maxRadius])
+				let radiusScale = d3.scaleLinear().domain(price).range([.25, maxRadius]);
+				// let colorScale = d3.scaleQuantize().domain(country).range(colors);
+				
+				let color = null;
+				dataset.forEach(function(row, index) {
+					var geometry = new THREE.SphereGeometry(radiusScale(row.price), 15, 15);
+					
+					if (row.country === "USA") color = 0x0000ff;
+					if (row.country === "Scotland") color = 0xff0000;
+					var material = new THREE.MeshBasicMaterial({
+						color: color,
+						transparent: true,
+						opacity: .15
+					});
+					var sphere = new THREE.Mesh(geometry, material);
+					sphere.position.set(xScale(row.age), yScale(row.rating), zScale(row.price));
+					targetList.push(sphere);
+					scene.add(sphere);
+				});
+			});
+		},
+		
+		preprocessWhiskey: function(row) {
+			
+			if (!uniqueCountries.includes(row.Country)) uniqueCountries.push(row.Country);
+			if (row.Name !== '*' && row.Rating !== '*' && row.Country !== '*' && row.Category !== '*' && row.Age !== '*' && row.ABV !== '*' && row.Brand !== '*' && row.Price !== '*' && parseInt(row.Price) < 125 && parseInt(row.Age) < 25 && (row.Country === "USA" || row.Country === "Scotland")) {
+
+				return {
+					name: row.Name,
+					rating: parseInt(row.Rating),
+					country: row.Country,
+					category: row.Category,
+					age: parseInt(row.Age),
+					abv: parseFloat(row.ABV),
+					brand: row.Brand,
+					price: row.Price
+				};
+			}
+		},
+		
 		ramp: function(color, index, total) { // pass a color interpolator or array of colors. will return a color based on percentage index / total
 			return color(index / (total - 1));
-		  }
+		}
 	}
 }

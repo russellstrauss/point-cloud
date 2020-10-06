@@ -184,6 +184,7 @@ const { Vector3 } = require("three");
 			showPoint: function(pt, color, size, opacity) {
 				color = color || 0xff0000;
 				opacity = opacity || 1;
+				size = size || 5;
 				let dotGeometry = new THREE.Geometry();
 				dotGeometry.vertices.push(pt);
 				let dotMaterial = new THREE.PointsMaterial({ 
@@ -461,6 +462,20 @@ const { Vector3 } = require("three");
 				let vector1 = new THREE.Vector3(endpoint1.x - vertex.x, endpoint1.y - vertex.y, endpoint1.z - vertex.z);
 				let vector2 = new THREE.Vector3(endpoint2.x - vertex.x, endpoint2.y - vertex.y, endpoint2.z - vertex.z);
 				return vector1.angleTo(vector2);
+			},
+			
+			intersects: function(event, camera, targetList) {
+				// targetList = [mesh_1, mesh_2, ...];
+				var raycaster = new THREE.Raycaster();
+				raycaster.setFromCamera(window.russells_magical_mouse, camera);
+				var intersects = raycaster.intersectObjects(targetList);
+				
+				if (intersects.length > 0) {
+					return intersects;
+				}
+				else {
+					return null;
+				}
 			}
 		}
 	})();

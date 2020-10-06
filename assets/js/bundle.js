@@ -1,6 +1,9 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 "use strict";
 
+var _require = require("three"),
+    Vector3 = _require.Vector3;
+
 module.exports = function () {
   var message = document.querySelector('.message');
   var pastData;
@@ -22,8 +25,12 @@ module.exports = function () {
       tickLength: 1
     }
   };
+  var uniqueCountries = []; // whiskey
+
+  var colors = ['red', 'blue', 'green', 'white', 'purple', 'pink', 'orange', '#710C96']; // whiskey
+
   var renderer, scene, camera, controls, floor;
-  var raycaster = new THREE.Raycaster();
+  var targetList = [];
   var black = new THREE.Color('black'),
       white = new THREE.Color('white'),
       green = new THREE.Color(0x00ff00),
@@ -156,6 +163,26 @@ module.exports = function () {
           gfx.toggleAxesHelper();
         }
       });
+      window.russells_magical_mouse = new THREE.Vector2();
+
+      var onMouseMove = function onMouseMove(event) {
+        window.russells_magical_mouse.x = (event.clientX - renderer.domElement.offsetLeft) / renderer.domElement.width * 2 - 1;
+        window.russells_magical_mouse.y = -((event.clientY - renderer.domElement.offsetTop) / renderer.domElement.height) * 2 + 1;
+      };
+
+      window.addEventListener('mousemove', onMouseMove, false);
+      document.querySelector('canvas').addEventListener('click', function (event) {
+        var clickedItems = gfx.intersects(event, camera, targetList);
+        if (clickedItems != null) self.handleClicks(clickedItems);
+      });
+    },
+    handleClicks: function handleClicks(clickedItems) {
+      var closestMesh = clickedItems[0].object;
+      var line = new Vector3(0, 25, 0);
+      gfx.drawLine(closestMesh.position, line, white, .75);
+      var labelPos = line.add(new Vector3(-2, 1, 0));
+      console.log(labelPos);
+      gfx.labelPoint(gfx.movePoint(closestMesh.position, labelPos), 'label', settings.axes.color);
     },
     addVertexColors: function addVertexColors() {
       var self = this;
@@ -346,8 +373,9 @@ module.exports = function () {
       };
 
       d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function (data1) {
-        pastData = data1;
-        self.lineChart();
+        pastData = data1; // self.lineChart();
+
+        self.bubbleChart();
         var length = settings.gridSize;
         var size = settings.gridSize;
         var interval = length / settings.axes.count;
@@ -437,6 +465,57 @@ module.exports = function () {
         }
       });
     },
+    bubbleChart: function bubbleChart() {
+      var self = this;
+      d3.csv('./assets/data/whiskeys.csv', self.preprocessWhiskey).then(function (dataset) {
+        var maxRadius = 6.5;
+        var price = d3.extent(dataset, function (d) {
+          return +d['price'];
+        });
+        var age = d3.extent(dataset, function (d) {
+          return +d['age'];
+        });
+        var rating = d3.extent(dataset, function (d) {
+          return d.rating;
+        });
+        var xScale = d3.scaleLinear().domain(age).range([-settings.gridSize / 2 + maxRadius, settings.gridSize / 2 - maxRadius]);
+        var yScale = d3.scaleLinear().domain(rating).range([settings.gridSize - maxRadius, maxRadius]);
+        var zScale = d3.scaleLinear().domain(price).range([-settings.gridSize / 2 + maxRadius, settings.gridSize / 2 - maxRadius]);
+        var radiusScale = d3.scaleLinear().domain(price).range([.25, maxRadius]); // let colorScale = d3.scaleQuantize().domain(country).range(colors);
+
+        var color = null;
+        dataset.forEach(function (row, index) {
+          var geometry = new THREE.SphereGeometry(radiusScale(row.price), 15, 15);
+          if (row.country === "USA") color = 0x0000ff;
+          if (row.country === "Scotland") color = 0xff0000;
+          var material = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: .15
+          });
+          var sphere = new THREE.Mesh(geometry, material);
+          sphere.position.set(xScale(row.age), yScale(row.rating), zScale(row.price));
+          targetList.push(sphere);
+          scene.add(sphere);
+        });
+      });
+    },
+    preprocessWhiskey: function preprocessWhiskey(row) {
+      if (!uniqueCountries.includes(row.Country)) uniqueCountries.push(row.Country);
+
+      if (row.Name !== '*' && row.Rating !== '*' && row.Country !== '*' && row.Category !== '*' && row.Age !== '*' && row.ABV !== '*' && row.Brand !== '*' && row.Price !== '*' && parseInt(row.Price) < 125 && parseInt(row.Age) < 25 && (row.Country === "USA" || row.Country === "Scotland")) {
+        return {
+          name: row.Name,
+          rating: parseInt(row.Rating),
+          country: row.Country,
+          category: row.Category,
+          age: parseInt(row.Age),
+          abv: parseFloat(row.ABV),
+          brand: row.Brand,
+          price: row.Price
+        };
+      }
+    },
     ramp: function ramp(color, index, total) {
       // pass a color interpolator or array of colors. will return a color based on percentage index / total
       return color(index / (total - 1));
@@ -444,7 +523,7 @@ module.exports = function () {
   };
 };
 
-},{}],2:[function(require,module,exports){
+},{"three":5}],2:[function(require,module,exports){
 "use strict";
 
 var _require = require("three"),
@@ -606,6 +685,7 @@ var _require = require("three"),
       showPoint: function showPoint(pt, color, size, opacity) {
         color = color || 0xff0000;
         opacity = opacity || 1;
+        size = size || 5;
         var dotGeometry = new THREE.Geometry();
         dotGeometry.vertices.push(pt);
         var dotMaterial = new THREE.PointsMaterial({
@@ -866,6 +946,18 @@ var _require = require("three"),
         var vector1 = new THREE.Vector3(endpoint1.x - vertex.x, endpoint1.y - vertex.y, endpoint1.z - vertex.z);
         var vector2 = new THREE.Vector3(endpoint2.x - vertex.x, endpoint2.y - vertex.y, endpoint2.z - vertex.z);
         return vector1.angleTo(vector2);
+      },
+      intersects: function intersects(event, camera, targetList) {
+        // targetList = [mesh_1, mesh_2, ...];
+        var raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(window.russells_magical_mouse, camera);
+        var intersects = raycaster.intersectObjects(targetList);
+
+        if (intersects.length > 0) {
+          return intersects;
+        } else {
+          return null;
+        }
       }
     };
   }();

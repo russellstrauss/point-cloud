@@ -1,4 +1,4 @@
-const { Vector3 } = require("three");
+const { Vector3 } = require('three');
 
 module.exports = function() {
 	
@@ -25,14 +25,17 @@ module.exports = function() {
 	
 	var uniqueCountries = []; // whiskey
 	var colors = ['red', 'blue', 'green', 'white', 'purple', 'pink', 'orange', '#710C96']; // whiskey
+	var bubbles = [], clickedLabels = [], dataPointLabels = [], bubbleOpacity = .15;
 	
 	var renderer, scene, camera, controls, floor;
 	var targetList = [];
 	var black = new THREE.Color('black'), white = new THREE.Color('white'), green = new THREE.Color(0x00ff00), red = new THREE.Color('#ED0000'), blue = new THREE.Color(0x0000ff);
 	var stats = new Stats();
+	var bottomLeft, nearestCorner;
 	
-	let interps = [d3.interpolateRainbow, d3.interpolateRgb("#450F66", "#B36002"), d3.interpolateRgb("white", "red"), d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu,d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn]
+	let interps = [d3.interpolateRainbow, d3.interpolateRgb('#450F66', '#B36002'), d3.interpolateRgb('white', 'red'), d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu,d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn]
 	let colorSchemes = [d3.schemeCategory10, d3.schemeAccent, d3.schemeDark2, d3.schemePaired, d3.schemePastel1, d3.schemePastel2, d3.schemeSet1, d3.schemeSet2, d3.schemeSet3, d3.schemeTableau10];
+
 	
 	return {
 		
@@ -56,13 +59,23 @@ module.exports = function() {
 			self.addStars();
 			self.setUpButtons();
 			// self.addVertexColors();
+			self.bubbleChart();
 			
 			var animate = function() {
 				requestAnimationFrame(animate);
 				renderer.render(scene, camera);
 				controls.update();
+				self.everyFrame();
 			};
 			animate(); 
+		},
+		
+		everyFrame: function() {
+			
+			dataPointLabels.forEach(function(label) {
+				// console.log(label);
+				label.quaternion.copy(camera.quaternion);
+			});
 		},
 		
 		addStars: function() {
@@ -87,11 +100,8 @@ module.exports = function() {
 			let density = 3;
 			
 			for (let x = range[0]; x <= range[1]; x += density) {
-				
 				for (let y = 0; y <= range[1] * 2; y += density) {
-
 					for (let z = range[0]; z <= range[1]; z += density) {
-						
 						let point = new THREE.Vector3(x, y, z);
 					}
 				}
@@ -168,23 +178,64 @@ module.exports = function() {
 			let onMouseMove = function(event) {
 				window.russells_magical_mouse.x = ( (event.clientX - renderer.domElement.offsetLeft) / renderer.domElement.width ) * 2 - 1;
 				window.russells_magical_mouse.y = -( (event.clientY - renderer.domElement.offsetTop) / renderer.domElement.height ) * 2 + 1;
+				
+				let hoveredItems = gfx.intersects(event, camera, targetList);
+				self.handleHovers(hoveredItems);
 			};
 			window.addEventListener('mousemove', onMouseMove, false);
 			
 			document.querySelector('canvas').addEventListener('click', function(event) {
 				let clickedItems = gfx.intersects(event, camera, targetList);
-				if (clickedItems != null) self.handleClicks(clickedItems);
+				self.handleClicks(clickedItems);
 			});
 		},
 		
+		hideAllBubbleLabels: function() {
+			let self = this;
+			if (bubbles) bubbles.forEach(function(mesh, index) {
+				self.hideLabel(mesh);
+			});
+		},
+		
+		hideClickedBubbleLabels: function() {
+			
+			if (clickedLabels) clickedLabels.forEach(function(mesh, index) {
+				scene.remove(mesh);
+			});
+			clickedLabels = [];
+		},
+		
+		handleHovers: function(hoveredItems) {
+			let self = this;
+			self.hideAllBubbleLabels();
+			
+			if (hoveredItems) {
+				self.showLabel(hoveredItems[0].object);
+			}
+		},
+		
+		showLabel: function(mesh) {
+			mesh.line.visible = true;
+			mesh.label.visible = true;
+			mesh.material.opacity = bubbleOpacity + .5;
+		},
+		
+		hideLabel: function(mesh) {
+			mesh.line.visible = false;
+			mesh.label.visible = false;
+			mesh.material.opacity = bubbleOpacity;
+		},
+		
 		handleClicks: function(clickedItems) {
-			let closestMesh = clickedItems[0].object;
-			let line = new Vector3(0, 25, 0);
-
-			gfx.drawLine(closestMesh.position, line, white, .75);
-			let labelPos = line.add(new Vector3(-2, 1, 0));
-			console.log(labelPos);
-			gfx.labelPoint(gfx.movePoint(closestMesh.position, labelPos), 'label', settings.axes.color);
+			let self = this;
+			let label;
+			if (clickedItems) {
+				self.showLabel(clickedItems[0].object);
+				// clickedLabels.push(label[0], label[1]);
+			}
+			else {
+				self.hideClickedBubbleLabels();
+			}
 		},
 		
 		addVertexColors: function() {
@@ -326,37 +377,13 @@ module.exports = function() {
 			scene.add(right);
 			
 			let white = 0xffffff;
-			let bottomLeft = new THREE.Vector3(-size/2, 0, -size/2), nearestCorner = new THREE.Vector3(-size/2, 0, size/2);
+			bottomLeft = new THREE.Vector3(-size/2, 0, -size/2), nearestCorner = new THREE.Vector3(-size/2, 0, size/2);
 			gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, size, -size/2), white, .5);
 			gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size/2, 0, size/2), white, .5);
 			gfx.drawLineFromPoints(new THREE.Vector3(-size/2, 0, size/2), new THREE.Vector3(size/2, 0, size/2), white, .5);
 
 			scene.background = worldColor;
 			//scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
-			
-			let axisScaleLabelColor = 0xffffff;
-			let count = settings.axes.count;
-			let length = settings.gridSize;
-			let interval = length/count;
-			let tickLength = settings.axes.tickLength;
-			let tick = new THREE.Vector3(-tickLength, 0, 0), tickRight = new THREE.Vector3(0, 0, tickLength);
-			
-			for (let i = 2; i < count+ 1; i+=2) { // z-axis ticks
-				let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, i*interval));
-				gfx.drawLine(tickOrigin, tick);
-				let label = (i).toString();
-				let offset = new THREE.Vector3(-(interval/8)*(label.length+1) - 2, -1, 0);
-				gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
-			}
-			for (let i = 0; i < count+ 1; i+=2) { // x-axis ticks
-				let tickOrigin = gfx.movePoint(nearestCorner, new THREE.Vector3(i*interval, 0, 0));
-				gfx.drawLine(tickOrigin, tickRight);
-				let label = (i).toString();
-				let offset = new THREE.Vector3(0, -1, (interval/100)*(label.length) + 2);
-				gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color, new THREE.Vector3(0, 0, 0));
-			}
-			gfx.labelLarge(new THREE.Vector3(-size/2 - size/20, -size/20, -5), "z-axis", settings.axes.color, new THREE.Vector3(0, -Math.PI / 2, 0));
-			gfx.labelLarge(new THREE.Vector3(-("x-axis".length/2 * size/40), -size/20, size/2 + size/20), "x-axis", settings.axes.color);
 			
 			return plane;
 		},
@@ -373,10 +400,10 @@ module.exports = function() {
 				return row;
 			};
 				
-			d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function(data1) {
-				pastData = data1;
+			d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function(dataset) {
+				pastData = dataset;
 				// self.lineChart();
-				self.bubbleChart();
+				
 				let length = settings.gridSize;
 				let size = settings.gridSize;
 				let interval = length/settings.axes.count;
@@ -385,22 +412,22 @@ module.exports = function() {
 				let count = settings.axes.count;
 				let tickLength = settings.axes.tickLength;
 				let tick = new THREE.Vector3(-tickLength, 0, 0), tickRight = new THREE.Vector3(0, 0, tickLength);
-				let maxValue = d3.max(data1, function (d) { return +d.amount; });
+				let maxValue = d3.max(dataset, function (d) { return +d.amount; });
 				var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]);
 				
-				let label = "production";
-				let charWidth = size/50;
-				gfx.labelLarge(new THREE.Vector3(-size/2 - (label.length * charWidth) - (maxValue.toString().length * charWidth) - 3, size/2, -size/2), label, 0xffffff);
+				// let label = 'Production';
+				// let charWidth = size/50;
+				// gfx.labelLarge(new THREE.Vector3(-size/2 - (label.length * charWidth) - (maxValue.toString().length * charWidth) - 3, size/2, -size/2), label, 0xffffff);
 				
-				for (let i = 0; i < count+ 1; i+=2) { // y-axis ticks
-					let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*interval, 0));
-					gfx.drawLine(tickOrigin, tick);
-					let label = ((maxValue/20) * i);
-					if (label > 1000000) label = label.toExponential();
-					label = label.toString();
-					let offset = new THREE.Vector3(-(interval/4)*(label.length+1) , -1, 0);
-					gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
-				}
+				// for (let i = 0; i < count+ 1; i += 2) { // y-axis ticks
+				// 	let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*interval, 0));
+				// 	gfx.drawLine(tickOrigin, tick);
+				// 	let label = ((maxValue/20) * (i + 1));
+				// 	if (label > 1000000) label = label.toExponential();
+				// 	label = label.toString();
+				// 	let offset = new THREE.Vector3(-(interval/4)*(label.length+1) , -1, 0);
+				// 	gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
+				// }
 			});
 		},
 		
@@ -417,7 +444,7 @@ module.exports = function() {
 			let prevPoint = null, prevXYProjection = null, prevZYProjection = null;
 			dataset.forEach(function(row, index) {
 				let colorScheme = d3.interpolateRdBu;
-				colorScheme = [d3.interpolateRainbow, d3.interpolateRgb("#450F66", "#B36002"), d3.interpolateRdBu];
+				colorScheme = [d3.interpolateRainbow, d3.interpolateRgb('#450F66', '#B36002'), d3.interpolateRdBu];
 				let color = self.ramp(interps[2], index, dataset.length);
 				let currentPoint = new THREE.Vector3(xScale(row.year), yScale(row.amount), xScale(row.year));
 				// gfx.showPoint(currentPoint, white, 4, .5);
@@ -462,7 +489,6 @@ module.exports = function() {
 					prevZYProjection = zyProjection;
 				}
 			});
-			
 		},
 		
 		bubbleChart: function() {
@@ -472,12 +498,18 @@ module.exports = function() {
 
 				let maxRadius = 6.5;
 				
+				let name = d3.extent(dataset, function(d) { return +d['name']; });
 				let price = d3.extent(dataset, function(d) { return +d['price']; });
 				let age = d3.extent(dataset, function(d) { return +d['age']; });
-				let rating = d3.extent(dataset, function(d) { return d.rating; });
+				let maxRating = d3.max(dataset, function(d) { return d.price; });
+				maxRating = 100;
+				let ratingLowerBound = 70;
+				let maxPrice = d3.max(dataset, function(d) { return d.price; });
+				let maxAge = d3.max(dataset, function(d) { return d.age; });
+				maxAge = 25;
 
 				let xScale = d3.scaleLinear().domain(age).range([-settings.gridSize/2 + maxRadius, settings.gridSize/2 - maxRadius]);
-				let yScale = d3.scaleLinear().domain(rating).range([settings.gridSize - maxRadius, maxRadius]);
+				let yScale = d3.scaleLinear().domain([ratingLowerBound, maxRating]).range([maxRadius, settings.gridSize - maxRadius]);
 				let zScale = d3.scaleLinear().domain(price).range([-settings.gridSize/2 + maxRadius, settings.gridSize/2 - maxRadius])
 				let radiusScale = d3.scaleLinear().domain(price).range([.25, maxRadius]);
 				// let colorScale = d3.scaleQuantize().domain(country).range(colors);
@@ -486,25 +518,99 @@ module.exports = function() {
 				dataset.forEach(function(row, index) {
 					var geometry = new THREE.SphereGeometry(radiusScale(row.price), 15, 15);
 					
-					if (row.country === "USA") color = 0x0000ff;
-					if (row.country === "Scotland") color = 0xff0000;
+					if (row.country === 'USA') color = 0x0000ff;
+					if (row.country === 'Scotland') color = 0xff0000;
 					var material = new THREE.MeshBasicMaterial({
 						color: color,
 						transparent: true,
-						opacity: .15
+						opacity: bubbleOpacity
 					});
-					var sphere = new THREE.Mesh(geometry, material);
+					
+					
+					
+					let sphere = new THREE.Mesh(geometry, material);
 					sphere.position.set(xScale(row.age), yScale(row.rating), zScale(row.price));
+					sphere.label = row.name + ' $' + row.price;
+					
+					self.placeLabel(sphere);
 					targetList.push(sphere);
+					bubbles.push(sphere);
 					scene.add(sphere);
 				});
+				
+				let axisScaleLabelColor = 0xffffff;
+				let count = settings.axes.count;
+				let length = settings.gridSize;
+				let interval = length/count;
+				let tickLength = settings.axes.tickLength;
+				let tick = new THREE.Vector3(-tickLength, 0, 0), tickRight = new THREE.Vector3(0, 0, tickLength);
+				
+				let label = 'Rating';
+				let charWidth = settings.gridSize/50;
+				gfx.labelLarge(new THREE.Vector3(-settings.gridSize/2 - (label.length * charWidth) - (maxRating.toString().length * charWidth) - 3, settings.gridSize/2, -settings.gridSize/2), label, 0xffffff);
+				
+				for (let i = 0; i < count + 1; i += 2) { // y-axis ticks
+					let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*interval, 0));
+					gfx.drawLine(tickOrigin, tick);
+					let label = (((maxRating - ratingLowerBound) / 20) * i) + ratingLowerBound;
+					if (label > 1000000) label = label.toExponential();
+					label = Math.round(label).toString();
+					let offset = new THREE.Vector3(-(interval/4)*(label.length+1) , -1, 0);
+					gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
+				}
+				
+				for (let i = 2; i < count + 1; i += 2) { // z-axis ticks
+					let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, i*interval));
+					gfx.drawLine(tickOrigin, tick);
+					let label = ((maxPrice/20) * (i + 1));
+					if (label > 1000000) label = label.toExponential();
+					label = '$' + Math.round(label).toString();
+					let offset = new THREE.Vector3(-(interval/8)*(label.length+1) - 2, -1, 0);
+					gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
+				}
+				
+				for (let i = 0; i < count+ 1; i += 2) { // x-axis ticks
+					let tickOrigin = gfx.movePoint(nearestCorner, new THREE.Vector3(i*interval, 0, 0));
+					gfx.drawLine(tickOrigin, tickRight);
+					let label = ((maxAge/20) * (i + 1));
+					if (label > 1000000) label = label.toExponential();
+					label = Math.round(label).toString();
+					let offset = new THREE.Vector3(0, -1, (interval/100)*(label.length) + 2);
+					gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color, new THREE.Vector3(0, 0, 0));
+				}
+				gfx.labelLarge(new THREE.Vector3(-settings.gridSize/2 - settings.gridSize/20, -settings.gridSize/20, -5), 'Price (USD)', settings.axes.color, new THREE.Vector3(0, -Math.PI / 2, 0));
+				gfx.labelLarge(new THREE.Vector3(-('Age'.length/2 * settings.gridSize/40), -settings.gridSize/20, settings.gridSize/2 + settings.gridSize/20), 'Age', settings.axes.color);
 			});
+		},
+		
+		placeLabel: function(mesh) {
+			let line = new Vector3(0, 10, 0);
+			let padding = .5;
+			let offset = mesh.position.clone().add(new Vector3(0, mesh.geometry.parameters.radius + padding, 0));
+			let lineMesh = gfx.drawLine(offset, line, white, .75);
+			
+			let labelOrigin = gfx.movePoint(mesh.position, line.clone().add(new Vector3(0, padding, 0)));
+			let nameLabel = gfx.labelPoint(new Vector3(0, 0, 0), mesh.label, settings.axes.color);
+			nameLabel.position.set(labelOrigin.x, labelOrigin.y, labelOrigin.z);
+			
+			nameLabel.geometry.computeBoundingBox(); // center align text
+			let translation = new Vector3(-1, 0, 0).multiplyScalar((nameLabel.geometry.boundingBox.max.x - nameLabel.geometry.boundingBox.min.x) / 2).add(new Vector3(0, padding * 2 + mesh.geometry.parameters.radius, 0));
+			nameLabel.geometry.translate(translation.x, translation.y, translation.z);
+			labelOrigin.add(new Vector3(0, translation.y, 0));
+			
+			mesh.label = nameLabel;
+			mesh.line = lineMesh;
+			
+			lineMesh.visible = false;
+			nameLabel.visible = false;
+			
+			dataPointLabels.push(nameLabel);
 		},
 		
 		preprocessWhiskey: function(row) {
 			
 			if (!uniqueCountries.includes(row.Country)) uniqueCountries.push(row.Country);
-			if (row.Name !== '*' && row.Rating !== '*' && row.Country !== '*' && row.Category !== '*' && row.Age !== '*' && row.ABV !== '*' && row.Brand !== '*' && row.Price !== '*' && parseInt(row.Price) < 125 && parseInt(row.Age) < 25 && (row.Country === "USA" || row.Country === "Scotland")) {
+			if (row.Name !== '*' && row.Rating !== '*' && row.Country !== '*' && row.Category !== '*' && row.Age !== '*' && row.ABV !== '*' && row.Brand !== '*' && row.Price !== '*' && parseInt(row.Price) < 125 && parseInt(row.Age) < 25 && (row.Country === 'USA' || row.Country === 'Scotland')) {
 
 				return {
 					name: row.Name,

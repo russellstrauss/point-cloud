@@ -1,7 +1,7 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 "use strict";
 
-var _require = require("three"),
+var _require = require('three'),
     Vector3 = _require.Vector3;
 
 module.exports = function () {
@@ -29,6 +29,10 @@ module.exports = function () {
 
   var colors = ['red', 'blue', 'green', 'white', 'purple', 'pink', 'orange', '#710C96']; // whiskey
 
+  var bubbles = [],
+      clickedLabels = [],
+      dataPointLabels = [],
+      bubbleOpacity = .15;
   var renderer, scene, camera, controls, floor;
   var targetList = [];
   var black = new THREE.Color('black'),
@@ -37,7 +41,8 @@ module.exports = function () {
       red = new THREE.Color('#ED0000'),
       blue = new THREE.Color(0x0000ff);
   var stats = new Stats();
-  var interps = [d3.interpolateRainbow, d3.interpolateRgb("#450F66", "#B36002"), d3.interpolateRgb("white", "red"), d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu, d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn];
+  var bottomLeft, nearestCorner;
+  var interps = [d3.interpolateRainbow, d3.interpolateRgb('#450F66', '#B36002'), d3.interpolateRgb('white', 'red'), d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu, d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn];
   var colorSchemes = [d3.schemeCategory10, d3.schemeAccent, d3.schemeDark2, d3.schemePaired, d3.schemePastel1, d3.schemePastel2, d3.schemeSet1, d3.schemeSet2, d3.schemeSet3, d3.schemeTableau10];
   return {
     init: function init() {
@@ -58,13 +63,22 @@ module.exports = function () {
       self.addStars();
       self.setUpButtons(); // self.addVertexColors();
 
+      self.bubbleChart();
+
       var animate = function animate() {
         requestAnimationFrame(animate);
         renderer.render(scene, camera);
         controls.update();
+        self.everyFrame();
       };
 
       animate();
+    },
+    everyFrame: function everyFrame() {
+      dataPointLabels.forEach(function (label) {
+        // console.log(label);
+        label.quaternion.copy(camera.quaternion);
+      });
     },
     addStars: function addStars() {
       var geometry = new THREE.BufferGeometry();
@@ -168,21 +182,55 @@ module.exports = function () {
       var onMouseMove = function onMouseMove(event) {
         window.russells_magical_mouse.x = (event.clientX - renderer.domElement.offsetLeft) / renderer.domElement.width * 2 - 1;
         window.russells_magical_mouse.y = -((event.clientY - renderer.domElement.offsetTop) / renderer.domElement.height) * 2 + 1;
+        var hoveredItems = gfx.intersects(event, camera, targetList);
+        self.handleHovers(hoveredItems);
       };
 
       window.addEventListener('mousemove', onMouseMove, false);
       document.querySelector('canvas').addEventListener('click', function (event) {
         var clickedItems = gfx.intersects(event, camera, targetList);
-        if (clickedItems != null) self.handleClicks(clickedItems);
+        self.handleClicks(clickedItems);
       });
     },
+    hideAllBubbleLabels: function hideAllBubbleLabels() {
+      var self = this;
+      if (bubbles) bubbles.forEach(function (mesh, index) {
+        self.hideLabel(mesh);
+      });
+    },
+    hideClickedBubbleLabels: function hideClickedBubbleLabels() {
+      if (clickedLabels) clickedLabels.forEach(function (mesh, index) {
+        scene.remove(mesh);
+      });
+      clickedLabels = [];
+    },
+    handleHovers: function handleHovers(hoveredItems) {
+      var self = this;
+      self.hideAllBubbleLabels();
+
+      if (hoveredItems) {
+        self.showLabel(hoveredItems[0].object);
+      }
+    },
+    showLabel: function showLabel(mesh) {
+      mesh.line.visible = true;
+      mesh.label.visible = true;
+      mesh.material.opacity = bubbleOpacity + .5;
+    },
+    hideLabel: function hideLabel(mesh) {
+      mesh.line.visible = false;
+      mesh.label.visible = false;
+      mesh.material.opacity = bubbleOpacity;
+    },
     handleClicks: function handleClicks(clickedItems) {
-      var closestMesh = clickedItems[0].object;
-      var line = new Vector3(0, 25, 0);
-      gfx.drawLine(closestMesh.position, line, white, .75);
-      var labelPos = line.add(new Vector3(-2, 1, 0));
-      console.log(labelPos);
-      gfx.labelPoint(gfx.movePoint(closestMesh.position, labelPos), 'label', settings.axes.color);
+      var self = this;
+      var label;
+
+      if (clickedItems) {
+        self.showLabel(clickedItems[0].object); // clickedLabels.push(label[0], label[1]);
+      } else {
+        self.hideClickedBubbleLabels();
+      }
     },
     addVertexColors: function addVertexColors() {
       var self = this;
@@ -320,45 +368,12 @@ module.exports = function () {
       right.position.set(size / 2, size / 2, -zBuff);
       scene.add(right);
       var white = 0xffffff;
-      var bottomLeft = new THREE.Vector3(-size / 2, 0, -size / 2),
-          nearestCorner = new THREE.Vector3(-size / 2, 0, size / 2);
+      bottomLeft = new THREE.Vector3(-size / 2, 0, -size / 2), nearestCorner = new THREE.Vector3(-size / 2, 0, size / 2);
       gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size / 2, size, -size / 2), white, .5);
       gfx.drawLineFromPoints(bottomLeft, new THREE.Vector3(-size / 2, 0, size / 2), white, .5);
       gfx.drawLineFromPoints(new THREE.Vector3(-size / 2, 0, size / 2), new THREE.Vector3(size / 2, 0, size / 2), white, .5);
       scene.background = worldColor; //scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
 
-      var axisScaleLabelColor = 0xffffff;
-      var count = settings.axes.count;
-      var length = settings.gridSize;
-      var interval = length / count;
-      var tickLength = settings.axes.tickLength;
-      var tick = new THREE.Vector3(-tickLength, 0, 0),
-          tickRight = new THREE.Vector3(0, 0, tickLength);
-
-      for (var i = 2; i < count + 1; i += 2) {
-        // z-axis ticks
-        var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, i * interval));
-        gfx.drawLine(tickOrigin, tick);
-        var label = i.toString();
-        var offset = new THREE.Vector3(-(interval / 8) * (label.length + 1) - 2, -1, 0);
-        gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
-      }
-
-      for (var _i = 0; _i < count + 1; _i += 2) {
-        // x-axis ticks
-        var _tickOrigin = gfx.movePoint(nearestCorner, new THREE.Vector3(_i * interval, 0, 0));
-
-        gfx.drawLine(_tickOrigin, tickRight);
-
-        var _label = _i.toString();
-
-        var _offset = new THREE.Vector3(0, -1, interval / 100 * _label.length + 2);
-
-        gfx.labelPoint(gfx.movePoint(_tickOrigin, _offset), _label, settings.axes.color, new THREE.Vector3(0, 0, 0));
-      }
-
-      gfx.labelLarge(new THREE.Vector3(-size / 2 - size / 20, -size / 20, -5), "z-axis", settings.axes.color, new THREE.Vector3(0, -Math.PI / 2, 0));
-      gfx.labelLarge(new THREE.Vector3(-("x-axis".length / 2 * size / 40), -size / 20, size / 2 + size / 20), "x-axis", settings.axes.color);
       return plane;
     },
     loadData: function loadData() {
@@ -372,10 +387,9 @@ module.exports = function () {
         return row;
       };
 
-      d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function (data1) {
-        pastData = data1; // self.lineChart();
+      d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function (dataset) {
+        pastData = dataset; // self.lineChart();
 
-        self.bubbleChart();
         var length = settings.gridSize;
         var size = settings.gridSize;
         var interval = length / settings.axes.count;
@@ -386,26 +400,21 @@ module.exports = function () {
         var tickLength = settings.axes.tickLength;
         var tick = new THREE.Vector3(-tickLength, 0, 0),
             tickRight = new THREE.Vector3(0, 0, tickLength);
-        var maxValue = d3.max(data1, function (d) {
+        var maxValue = d3.max(dataset, function (d) {
           return +d.amount;
         });
-        var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]);
-        var label = "production";
-        var charWidth = size / 50;
-        gfx.labelLarge(new THREE.Vector3(-size / 2 - label.length * charWidth - maxValue.toString().length * charWidth - 3, size / 2, -size / 2), label, 0xffffff);
-
-        for (var i = 0; i < count + 1; i += 2) {
-          // y-axis ticks
-          var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i * interval, 0));
-          gfx.drawLine(tickOrigin, tick);
-
-          var _label2 = maxValue / 20 * i;
-
-          if (_label2 > 1000000) _label2 = _label2.toExponential();
-          _label2 = _label2.toString();
-          var offset = new THREE.Vector3(-(interval / 4) * (_label2.length + 1), -1, 0);
-          gfx.labelPoint(gfx.movePoint(tickOrigin, offset), _label2, settings.axes.color);
-        }
+        var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]); // let label = 'Production';
+        // let charWidth = size/50;
+        // gfx.labelLarge(new THREE.Vector3(-size/2 - (label.length * charWidth) - (maxValue.toString().length * charWidth) - 3, size/2, -size/2), label, 0xffffff);
+        // for (let i = 0; i < count+ 1; i += 2) { // y-axis ticks
+        // 	let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*interval, 0));
+        // 	gfx.drawLine(tickOrigin, tick);
+        // 	let label = ((maxValue/20) * (i + 1));
+        // 	if (label > 1000000) label = label.toExponential();
+        // 	label = label.toString();
+        // 	let offset = new THREE.Vector3(-(interval/4)*(label.length+1) , -1, 0);
+        // 	gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
+        // }
       });
     },
     lineChart: function lineChart() {
@@ -422,7 +431,7 @@ module.exports = function () {
           prevZYProjection = null;
       dataset.forEach(function (row, index) {
         var colorScheme = d3.interpolateRdBu;
-        colorScheme = [d3.interpolateRainbow, d3.interpolateRgb("#450F66", "#B36002"), d3.interpolateRdBu];
+        colorScheme = [d3.interpolateRainbow, d3.interpolateRgb('#450F66', '#B36002'), d3.interpolateRdBu];
         var color = self.ramp(interps[2], index, dataset.length);
         var currentPoint = new THREE.Vector3(xScale(row.year), yScale(row.amount), xScale(row.year)); // gfx.showPoint(currentPoint, white, 4, .5);
 
@@ -469,41 +478,133 @@ module.exports = function () {
       var self = this;
       d3.csv('./assets/data/whiskeys.csv', self.preprocessWhiskey).then(function (dataset) {
         var maxRadius = 6.5;
+        var name = d3.extent(dataset, function (d) {
+          return +d['name'];
+        });
         var price = d3.extent(dataset, function (d) {
           return +d['price'];
         });
         var age = d3.extent(dataset, function (d) {
           return +d['age'];
         });
-        var rating = d3.extent(dataset, function (d) {
-          return d.rating;
+        var maxRating = d3.max(dataset, function (d) {
+          return d.price;
         });
+        maxRating = 100;
+        var ratingLowerBound = 70;
+        var maxPrice = d3.max(dataset, function (d) {
+          return d.price;
+        });
+        var maxAge = d3.max(dataset, function (d) {
+          return d.age;
+        });
+        maxAge = 25;
         var xScale = d3.scaleLinear().domain(age).range([-settings.gridSize / 2 + maxRadius, settings.gridSize / 2 - maxRadius]);
-        var yScale = d3.scaleLinear().domain(rating).range([settings.gridSize - maxRadius, maxRadius]);
+        var yScale = d3.scaleLinear().domain([ratingLowerBound, maxRating]).range([maxRadius, settings.gridSize - maxRadius]);
         var zScale = d3.scaleLinear().domain(price).range([-settings.gridSize / 2 + maxRadius, settings.gridSize / 2 - maxRadius]);
         var radiusScale = d3.scaleLinear().domain(price).range([.25, maxRadius]); // let colorScale = d3.scaleQuantize().domain(country).range(colors);
 
         var color = null;
         dataset.forEach(function (row, index) {
           var geometry = new THREE.SphereGeometry(radiusScale(row.price), 15, 15);
-          if (row.country === "USA") color = 0x0000ff;
-          if (row.country === "Scotland") color = 0xff0000;
+          if (row.country === 'USA') color = 0x0000ff;
+          if (row.country === 'Scotland') color = 0xff0000;
           var material = new THREE.MeshBasicMaterial({
             color: color,
             transparent: true,
-            opacity: .15
+            opacity: bubbleOpacity
           });
           var sphere = new THREE.Mesh(geometry, material);
           sphere.position.set(xScale(row.age), yScale(row.rating), zScale(row.price));
+          sphere.label = row.name + ' $' + row.price;
+          self.placeLabel(sphere);
           targetList.push(sphere);
+          bubbles.push(sphere);
           scene.add(sphere);
         });
+        var axisScaleLabelColor = 0xffffff;
+        var count = settings.axes.count;
+        var length = settings.gridSize;
+        var interval = length / count;
+        var tickLength = settings.axes.tickLength;
+        var tick = new THREE.Vector3(-tickLength, 0, 0),
+            tickRight = new THREE.Vector3(0, 0, tickLength);
+        var label = 'Rating';
+        var charWidth = settings.gridSize / 50;
+        gfx.labelLarge(new THREE.Vector3(-settings.gridSize / 2 - label.length * charWidth - maxRating.toString().length * charWidth - 3, settings.gridSize / 2, -settings.gridSize / 2), label, 0xffffff);
+
+        for (var i = 0; i < count + 1; i += 2) {
+          // y-axis ticks
+          var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i * interval, 0));
+          gfx.drawLine(tickOrigin, tick);
+
+          var _label = (maxRating - ratingLowerBound) / 20 * i + ratingLowerBound;
+
+          if (_label > 1000000) _label = _label.toExponential();
+          _label = Math.round(_label).toString();
+          var offset = new THREE.Vector3(-(interval / 4) * (_label.length + 1), -1, 0);
+          gfx.labelPoint(gfx.movePoint(tickOrigin, offset), _label, settings.axes.color);
+        }
+
+        for (var _i = 2; _i < count + 1; _i += 2) {
+          // z-axis ticks
+          var _tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, _i * interval));
+
+          gfx.drawLine(_tickOrigin, tick);
+
+          var _label2 = maxPrice / 20 * (_i + 1);
+
+          if (_label2 > 1000000) _label2 = _label2.toExponential();
+          _label2 = '$' + Math.round(_label2).toString();
+
+          var _offset = new THREE.Vector3(-(interval / 8) * (_label2.length + 1) - 2, -1, 0);
+
+          gfx.labelPoint(gfx.movePoint(_tickOrigin, _offset), _label2, settings.axes.color);
+        }
+
+        for (var _i2 = 0; _i2 < count + 1; _i2 += 2) {
+          // x-axis ticks
+          var _tickOrigin2 = gfx.movePoint(nearestCorner, new THREE.Vector3(_i2 * interval, 0, 0));
+
+          gfx.drawLine(_tickOrigin2, tickRight);
+
+          var _label3 = maxAge / 20 * (_i2 + 1);
+
+          if (_label3 > 1000000) _label3 = _label3.toExponential();
+          _label3 = Math.round(_label3).toString();
+
+          var _offset2 = new THREE.Vector3(0, -1, interval / 100 * _label3.length + 2);
+
+          gfx.labelPoint(gfx.movePoint(_tickOrigin2, _offset2), _label3, settings.axes.color, new THREE.Vector3(0, 0, 0));
+        }
+
+        gfx.labelLarge(new THREE.Vector3(-settings.gridSize / 2 - settings.gridSize / 20, -settings.gridSize / 20, -5), 'Price (USD)', settings.axes.color, new THREE.Vector3(0, -Math.PI / 2, 0));
+        gfx.labelLarge(new THREE.Vector3(-('Age'.length / 2 * settings.gridSize / 40), -settings.gridSize / 20, settings.gridSize / 2 + settings.gridSize / 20), 'Age', settings.axes.color);
       });
+    },
+    placeLabel: function placeLabel(mesh) {
+      var line = new Vector3(0, 10, 0);
+      var padding = .5;
+      var offset = mesh.position.clone().add(new Vector3(0, mesh.geometry.parameters.radius + padding, 0));
+      var lineMesh = gfx.drawLine(offset, line, white, .75);
+      var labelOrigin = gfx.movePoint(mesh.position, line.clone().add(new Vector3(0, padding, 0)));
+      var nameLabel = gfx.labelPoint(new Vector3(0, 0, 0), mesh.label, settings.axes.color);
+      nameLabel.position.set(labelOrigin.x, labelOrigin.y, labelOrigin.z);
+      nameLabel.geometry.computeBoundingBox(); // center align text
+
+      var translation = new Vector3(-1, 0, 0).multiplyScalar((nameLabel.geometry.boundingBox.max.x - nameLabel.geometry.boundingBox.min.x) / 2).add(new Vector3(0, padding * 2 + mesh.geometry.parameters.radius, 0));
+      nameLabel.geometry.translate(translation.x, translation.y, translation.z);
+      labelOrigin.add(new Vector3(0, translation.y, 0));
+      mesh.label = nameLabel;
+      mesh.line = lineMesh;
+      lineMesh.visible = false;
+      nameLabel.visible = false;
+      dataPointLabels.push(nameLabel);
     },
     preprocessWhiskey: function preprocessWhiskey(row) {
       if (!uniqueCountries.includes(row.Country)) uniqueCountries.push(row.Country);
 
-      if (row.Name !== '*' && row.Rating !== '*' && row.Country !== '*' && row.Category !== '*' && row.Age !== '*' && row.ABV !== '*' && row.Brand !== '*' && row.Price !== '*' && parseInt(row.Price) < 125 && parseInt(row.Age) < 25 && (row.Country === "USA" || row.Country === "Scotland")) {
+      if (row.Name !== '*' && row.Rating !== '*' && row.Country !== '*' && row.Category !== '*' && row.Age !== '*' && row.ABV !== '*' && row.Brand !== '*' && row.Price !== '*' && parseInt(row.Price) < 125 && parseInt(row.Age) < 25 && (row.Country === 'USA' || row.Country === 'Scotland')) {
         return {
           name: row.Name,
           rating: parseInt(row.Rating),
@@ -737,6 +838,7 @@ var _require = require("three"),
           textGeometry.rotateZ(rotation.z);
           textGeometry.translate(pt.x, pt.y, pt.z);
           scene.add(mesh);
+          return mesh;
         }
       },
       labelLarge: function labelLarge(pt, label, color, rotation) {
@@ -770,6 +872,7 @@ var _require = require("three"),
         geometry.vertices.push(gfx.movePoint(origin, vector));
         var line = new THREE.Line(geometry, material);
         scene.add(line);
+        return line;
       },
       drawLineFromPoints: function drawLineFromPoints(pt1, pt2, color, alpha) {
         color = color || 0x0000ff;

@@ -232,6 +232,7 @@ const { Vector3 } = require("three");
 					textGeometry.rotateX(rotation.x); textGeometry.rotateY(rotation.y); textGeometry.rotateZ(rotation.z);
 					textGeometry.translate(pt.x, pt.y, pt.z);
 					scene.add(mesh);
+					return mesh;
 				}
 			},
 			
@@ -265,6 +266,7 @@ const { Vector3 } = require("three");
 				
 				let line = new THREE.Line(geometry, material);
 				scene.add(line);
+				return line;
 			},
 			
 			drawLineFromPoints: function(pt1, pt2, color, alpha) {

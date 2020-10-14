@@ -217,7 +217,7 @@ module.exports = function() {
 		showLabel: function(mesh) {
 			mesh.line.visible = true;
 			mesh.label.visible = true;
-			mesh.material.opacity = bubbleOpacity + .5;
+			mesh.material.opacity = bubbleOpacity + .25;
 		},
 		
 		hideLabel: function(mesh) {

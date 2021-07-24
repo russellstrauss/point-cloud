@@ -2,15 +2,16 @@
 "use strict";
 
 var _require = require('three'),
-    Vector3 = _require.Vector3;
+    Vector3 = _require.Vector3,
+    Clock = _require.Clock;
 
 module.exports = function () {
   var message = document.querySelector('.message');
   var pastData;
   var settings = {
     defaultCameraLocation: {
-      x: -90,
-      y: 110,
+      x: 50,
+      y: 100,
       z: 80
     },
     messageDuration: 2000,
@@ -44,41 +45,76 @@ module.exports = function () {
   var bottomLeft, nearestCorner;
   var interps = [d3.interpolateRainbow, d3.interpolateRgb('#450F66', '#B36002'), d3.interpolateRgb('white', 'red'), d3.interpolateSinebow, d3.interpolateYlOrRd, d3.interpolateYlGnBu, d3.interpolateRdPu, d3.interpolatePuBu, d3.interpolateGnBu, d3.interpolateBuPu, d3.interpolateCubehelixDefault, d3.interpolateCool, d3.interpolateWarm, d3.interpolateCividis, d3.interpolatePlasma, d3.interpolateMagma, d3.interpolateInferno, d3.interpolateViridis, d3.interpolateTurbo, d3.interpolatePurples, d3.interpolateReds, d3.interpolateOranges, d3.interpolateGreys, d3.interpolateGreens, d3.interpolateBlues, d3.interpolateSpectral, d3.interpolateRdYlBu, d3.interpolateRdBu, d3.interpolatePuOr, d3.interpolatePiYG, d3.interpolatePRGn];
   var colorSchemes = [d3.schemeCategory10, d3.schemeAccent, d3.schemeDark2, d3.schemePaired, d3.schemePastel1, d3.schemePastel2, d3.schemeSet1, d3.schemeSet2, d3.schemeSet3, d3.schemeTableau10];
+  var curve = [];
+  var progress = 0;
+  var camera_speed = 2;
+  var curve_index = 0;
   return {
     init: function init() {
       var self = this;
       self.loadFont();
-      self.loadData();
     },
     begin: function begin() {
       var self = this;
       scene = gfx.setUpScene();
       renderer = gfx.setUpRenderer(renderer);
       camera = gfx.setUpCamera(camera);
-      floor = self.addGrid(settings.gridSize, settings.colors.worldColor, settings.colors.gridColor);
+      scene.background = settings.colors.worldColor; // floor = self.addGrid(settings.gridSize, settings.colors.worldColor, settings.colors.gridColor);
+
       controls = gfx.enableControls(controls, renderer, camera);
       gfx.resizeRendererOnWindowResize(renderer, camera);
       gfx.setUpLights();
       gfx.setCameraLocation(camera, settings.defaultCameraLocation);
       self.addStars();
+      self.createCurve();
       self.setUpButtons(); // self.addVertexColors();
 
-      self.bubbleChart();
-
-      var animate = function animate() {
+      var animate = function animate(now) {
         requestAnimationFrame(animate);
-        renderer.render(scene, camera);
         controls.update();
         self.everyFrame();
+        renderer.render(scene, camera);
       };
 
       animate();
     },
-    everyFrame: function everyFrame() {
-      dataPointLabels.forEach(function (label) {
-        // console.log(label);
-        label.quaternion.copy(camera.quaternion);
-      });
+    everyFrame: function everyFrame() {//this.updateCamera();
+    },
+    updateCamera: function updateCamera() {
+      var clock = new THREE.Clock();
+      var dt = clock.getDelta();
+      clock.start(); // curve_index = Math.round(curve.length * progress);
+
+      console.log(dt); // progress += dt * 1000 * camera_speed;
+      // if (progress > 1) progress = 0;
+
+      camera.position.set(curve[curve_index].x, curve[curve_index].y, curve[curve_index].z);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
+    },
+    createCurve: function createCurve() {
+      var iteration_count = 10001;
+      var step_delta = 0.001;
+      var curve_length = step_delta * iteration_count;
+      var radius_scale = 1;
+      var a = .75;
+      var k = .5;
+      var height_scale = 2;
+      var lower_bound = 1;
+      var prevPt = new THREE.Vector3(0, 0, 0);
+
+      for (var i = 0; i < curve_length; i += step_delta) {
+        // # Calculate curve point position
+        var spiral_x = radius_scale * a * Math.pow(Math.E, k * i) * Math.cos(i);
+        var spiral_y = height_scale * height_scale * Math.log(i, Math.E) + lower_bound;
+        var spiral_z = radius_scale * a * Math.pow(Math.E, k * i) * Math.sin(i);
+        var spiralPt = new THREE.Vector3(spiral_x, spiral_y, spiral_z);
+        var showLine = true;
+        if (showLine === true) gfx.drawLineFromPoints(prevPt, spiralPt);
+        prevPt = spiralPt;
+        curve.push(spiralPt);
+      }
+
+      curve.reverse();
     },
     addStars: function addStars() {
       var geometry = new THREE.BufferGeometry();
@@ -177,60 +213,6 @@ module.exports = function () {
           gfx.toggleAxesHelper();
         }
       });
-      window.russells_magical_mouse = new THREE.Vector2();
-
-      var onMouseMove = function onMouseMove(event) {
-        window.russells_magical_mouse.x = (event.clientX - renderer.domElement.offsetLeft) / renderer.domElement.width * 2 - 1;
-        window.russells_magical_mouse.y = -((event.clientY - renderer.domElement.offsetTop) / renderer.domElement.height) * 2 + 1;
-        var hoveredItems = gfx.intersects(event, camera, targetList);
-        self.handleHovers(hoveredItems);
-      };
-
-      window.addEventListener('mousemove', onMouseMove, false);
-      document.querySelector('canvas').addEventListener('click', function (event) {
-        var clickedItems = gfx.intersects(event, camera, targetList);
-        self.handleClicks(clickedItems);
-      });
-    },
-    hideAllBubbleLabels: function hideAllBubbleLabels() {
-      var self = this;
-      if (bubbles) bubbles.forEach(function (mesh, index) {
-        self.hideLabel(mesh);
-      });
-    },
-    hideClickedBubbleLabels: function hideClickedBubbleLabels() {
-      if (clickedLabels) clickedLabels.forEach(function (mesh, index) {
-        scene.remove(mesh);
-      });
-      clickedLabels = [];
-    },
-    handleHovers: function handleHovers(hoveredItems) {
-      var self = this;
-      self.hideAllBubbleLabels();
-
-      if (hoveredItems) {
-        self.showLabel(hoveredItems[0].object);
-      }
-    },
-    showLabel: function showLabel(mesh) {
-      mesh.line.visible = true;
-      mesh.label.visible = true;
-      mesh.material.opacity = bubbleOpacity + .25;
-    },
-    hideLabel: function hideLabel(mesh) {
-      mesh.line.visible = false;
-      mesh.label.visible = false;
-      mesh.material.opacity = bubbleOpacity;
-    },
-    handleClicks: function handleClicks(clickedItems) {
-      var self = this;
-      var label;
-
-      if (clickedItems) {
-        self.showLabel(clickedItems[0].object); // clickedLabels.push(label[0], label[1]);
-      } else {
-        self.hideClickedBubbleLabels();
-      }
     },
     addVertexColors: function addVertexColors() {
       var self = this;
@@ -240,7 +222,7 @@ module.exports = function () {
         // loaded
         var geometry = obj.children[0].geometry;
         var material = new THREE.PointsMaterial({
-          size: 1 / 3,
+          size: .75,
           vertexColors: THREE.VertexColors
         });
         var mesh = new THREE.Points(geometry, material);
@@ -251,18 +233,18 @@ module.exports = function () {
         switch (file) {
           case './assets/obj/teapot.obj':
             mesh.scale.set(15, 15, 15); // colors = self.interpolateColors(geometry, color1, color2);
-            // colors = self.interpolateD3Colors(geometry, color1, color2, interps[10], true);
 
-            colors = self.d3Stripes(geometry, colorSchemes[9]);
+            colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateRgb('blue', 'red'), true); // colors = self.d3Stripes(geometry, colorSchemes[9]);
+
             break;
 
           case './assets/obj/bunny.obj':
             mesh.scale.set(500, 500, 500);
             mesh.position.y -= 16.5;
-            mesh.position.x += 10; // colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateYlGnBu, true);
-            // colors = self.interpolateD3Colors(geometry, color1, color2, interps[1], true);
+            mesh.position.x += 10;
+            colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateYlGnBu, true); // colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateRgb('#24333A', '#E7582E'), true);
+            // colors = self.d3Stripes(geometry, colorSchemes[1]);
 
-            colors = self.d3Stripes(geometry, colorSchemes[6]);
             break;
         }
 
@@ -375,247 +357,6 @@ module.exports = function () {
       scene.background = worldColor; //scene.fog = new THREE.FogExp2(new THREE.Color('black'), 0.002);
 
       return plane;
-    },
-    loadData: function loadData() {
-      var self = this;
-      var dataset = pastData;
-
-      var preparePast = function preparePast(d, i) {
-        var row = {};
-        row.year = d['Year'];
-        row.amount = d['Global plastics production (million tons)'];
-        return row;
-      };
-
-      d3.csv('./assets/data/global-plastics-production.csv', preparePast).then(function (dataset) {
-        pastData = dataset; // self.lineChart();
-
-        var length = settings.gridSize;
-        var size = settings.gridSize;
-        var interval = length / settings.axes.count;
-        var bottomLeft = new THREE.Vector3(-size / 2, 0, -size / 2),
-            nearestCorner = new THREE.Vector3(-size / 2, 0, size / 2);
-        var axisScaleLabelColor = 0xffffff;
-        var count = settings.axes.count;
-        var tickLength = settings.axes.tickLength;
-        var tick = new THREE.Vector3(-tickLength, 0, 0),
-            tickRight = new THREE.Vector3(0, 0, tickLength);
-        var maxValue = d3.max(dataset, function (d) {
-          return +d.amount;
-        });
-        var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]); // let label = 'Production';
-        // let charWidth = size/50;
-        // gfx.labelLarge(new THREE.Vector3(-size/2 - (label.length * charWidth) - (maxValue.toString().length * charWidth) - 3, size/2, -size/2), label, 0xffffff);
-        // for (let i = 0; i < count+ 1; i += 2) { // y-axis ticks
-        // 	let tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i*interval, 0));
-        // 	gfx.drawLine(tickOrigin, tick);
-        // 	let label = ((maxValue/20) * (i + 1));
-        // 	if (label > 1000000) label = label.toExponential();
-        // 	label = label.toString();
-        // 	let offset = new THREE.Vector3(-(interval/4)*(label.length+1) , -1, 0);
-        // 	gfx.labelPoint(gfx.movePoint(tickOrigin, offset), label, settings.axes.color);
-        // }
-      });
-    },
-    lineChart: function lineChart() {
-      var self = this;
-      var dataset = pastData;
-      var offset = settings.gridSize / 2;
-      var xScale = d3.scaleLinear().domain([1950, 2015]).range([-offset, settings.gridSize - offset]);
-      var maxValue = d3.max(dataset, function (d) {
-        return +d.amount;
-      });
-      var yScale = d3.scaleLinear().domain([0, maxValue]).range([0, settings.gridSize]);
-      var prevPoint = null,
-          prevXYProjection = null,
-          prevZYProjection = null;
-      dataset.forEach(function (row, index) {
-        var colorScheme = d3.interpolateRdBu;
-        colorScheme = [d3.interpolateRainbow, d3.interpolateRgb('#450F66', '#B36002'), d3.interpolateRdBu];
-        var color = self.ramp(interps[2], index, dataset.length);
-        var currentPoint = new THREE.Vector3(xScale(row.year), yScale(row.amount), xScale(row.year)); // gfx.showPoint(currentPoint, white, 4, .5);
-
-        var fillLineChart = false;
-        if (prevPoint !== null) gfx.drawLineFromPoints(prevPoint, currentPoint, color, 1);
-
-        if (prevPoint !== null && fillLineChart) {
-          var fillGeometry = new THREE.Geometry();
-          fillGeometry.vertices.push(new THREE.Vector3(prevPoint.x, 0, prevPoint.z), new THREE.Vector3(prevPoint.x, prevPoint.y, prevPoint.z), new THREE.Vector3(currentPoint.x, currentPoint.y, currentPoint.z), new THREE.Vector3(currentPoint.x, 0, currentPoint.z));
-          fillGeometry.faces.push(new THREE.Face3(0, 1, 2));
-          fillGeometry.faces.push(new THREE.Face3(2, 3, 0));
-          var material = new THREE.MeshBasicMaterial({
-            color: color,
-            side: THREE.DoubleSide
-          });
-          var mesh = new THREE.Mesh(fillGeometry, material);
-          scene.add(mesh);
-        }
-
-        prevPoint = currentPoint; //gfx.drawLineFromPoints(new THREE.Vector3(currentPoint.x, 0, currentPoint.z), currentPoint, color, .1); // add pretty vertical lines
-
-        var enableXYProjection = true;
-
-        if (enableXYProjection) {
-          var xyProjection = new THREE.Vector3(currentPoint.x, currentPoint.y, 0 - settings.gridSize / 2);
-          gfx.drawLineFromPoints(xyProjection, currentPoint, white, .05); // y-value indicators
-
-          if (prevXYProjection !== null) gfx.drawLineFromPoints(prevXYProjection, xyProjection, red, 1);
-          prevXYProjection = xyProjection;
-        }
-
-        var enableZYProjection = false;
-
-        if (enableZYProjection) {
-          var zyProjection = new THREE.Vector3(settings.gridSize / 2, currentPoint.y, currentPoint.z);
-          gfx.drawLineFromPoints(zyProjection, currentPoint, white, .1); // y-value indicators
-
-          if (prevZYProjection !== null) gfx.drawLineFromPoints(prevZYProjection, zyProjection, blue, .5);
-          prevZYProjection = zyProjection;
-        }
-      });
-    },
-    bubbleChart: function bubbleChart() {
-      var self = this;
-      d3.csv('./assets/data/whiskeys.csv', self.preprocessWhiskey).then(function (dataset) {
-        var maxRadius = 6.5;
-        var name = d3.extent(dataset, function (d) {
-          return +d['name'];
-        });
-        var price = d3.extent(dataset, function (d) {
-          return +d['price'];
-        });
-        var age = d3.extent(dataset, function (d) {
-          return +d['age'];
-        });
-        var maxRating = d3.max(dataset, function (d) {
-          return d.price;
-        });
-        maxRating = 100;
-        var ratingLowerBound = 70;
-        var maxPrice = d3.max(dataset, function (d) {
-          return d.price;
-        });
-        var maxAge = d3.max(dataset, function (d) {
-          return d.age;
-        });
-        maxAge = 25;
-        var xScale = d3.scaleLinear().domain(age).range([-settings.gridSize / 2 + maxRadius, settings.gridSize / 2 - maxRadius]);
-        var yScale = d3.scaleLinear().domain([ratingLowerBound, maxRating]).range([maxRadius, settings.gridSize - maxRadius]);
-        var zScale = d3.scaleLinear().domain(price).range([-settings.gridSize / 2 + maxRadius, settings.gridSize / 2 - maxRadius]);
-        var radiusScale = d3.scaleLinear().domain(price).range([.25, maxRadius]); // let colorScale = d3.scaleQuantize().domain(country).range(colors);
-
-        var color = null;
-        dataset.forEach(function (row, index) {
-          var geometry = new THREE.SphereGeometry(radiusScale(row.price), 15, 15);
-          if (row.country === 'USA') color = 0x0000ff;
-          if (row.country === 'Scotland') color = 0xff0000;
-          var material = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: bubbleOpacity
-          });
-          var sphere = new THREE.Mesh(geometry, material);
-          sphere.position.set(xScale(row.age), yScale(row.rating), zScale(row.price));
-          sphere.label = row.name + ' $' + row.price;
-          self.placeLabel(sphere);
-          targetList.push(sphere);
-          bubbles.push(sphere);
-          scene.add(sphere);
-        });
-        var axisScaleLabelColor = 0xffffff;
-        var count = settings.axes.count;
-        var length = settings.gridSize;
-        var interval = length / count;
-        var tickLength = settings.axes.tickLength;
-        var tick = new THREE.Vector3(-tickLength, 0, 0),
-            tickRight = new THREE.Vector3(0, 0, tickLength);
-        var label = 'Rating';
-        var charWidth = settings.gridSize / 50;
-        gfx.labelLarge(new THREE.Vector3(-settings.gridSize / 2 - label.length * charWidth - maxRating.toString().length * charWidth - 3, settings.gridSize / 2, -settings.gridSize / 2), label, 0xffffff);
-
-        for (var i = 0; i < count + 1; i += 2) {
-          // y-axis ticks
-          var tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, i * interval, 0));
-          gfx.drawLine(tickOrigin, tick);
-
-          var _label = (maxRating - ratingLowerBound) / 20 * i + ratingLowerBound;
-
-          if (_label > 1000000) _label = _label.toExponential();
-          _label = Math.round(_label).toString();
-          var offset = new THREE.Vector3(-(interval / 4) * (_label.length + 1), -1, 0);
-          gfx.labelPoint(gfx.movePoint(tickOrigin, offset), _label, settings.axes.color);
-        }
-
-        for (var _i = 2; _i < count + 1; _i += 2) {
-          // z-axis ticks
-          var _tickOrigin = gfx.movePoint(bottomLeft, new THREE.Vector3(0, 0, _i * interval));
-
-          gfx.drawLine(_tickOrigin, tick);
-
-          var _label2 = maxPrice / 20 * (_i + 1);
-
-          if (_label2 > 1000000) _label2 = _label2.toExponential();
-          _label2 = '$' + Math.round(_label2).toString();
-
-          var _offset = new THREE.Vector3(-(interval / 8) * (_label2.length + 1) - 2, -1, 0);
-
-          gfx.labelPoint(gfx.movePoint(_tickOrigin, _offset), _label2, settings.axes.color);
-        }
-
-        for (var _i2 = 0; _i2 < count + 1; _i2 += 2) {
-          // x-axis ticks
-          var _tickOrigin2 = gfx.movePoint(nearestCorner, new THREE.Vector3(_i2 * interval, 0, 0));
-
-          gfx.drawLine(_tickOrigin2, tickRight);
-
-          var _label3 = maxAge / 20 * (_i2 + 1);
-
-          if (_label3 > 1000000) _label3 = _label3.toExponential();
-          _label3 = Math.round(_label3).toString();
-
-          var _offset2 = new THREE.Vector3(0, -1, interval / 100 * _label3.length + 2);
-
-          gfx.labelPoint(gfx.movePoint(_tickOrigin2, _offset2), _label3, settings.axes.color, new THREE.Vector3(0, 0, 0));
-        }
-
-        gfx.labelLarge(new THREE.Vector3(-settings.gridSize / 2 - settings.gridSize / 20, -settings.gridSize / 20, -5), 'Price (USD)', settings.axes.color, new THREE.Vector3(0, -Math.PI / 2, 0));
-        gfx.labelLarge(new THREE.Vector3(-('Age'.length / 2 * settings.gridSize / 40), -settings.gridSize / 20, settings.gridSize / 2 + settings.gridSize / 20), 'Age', settings.axes.color);
-      });
-    },
-    placeLabel: function placeLabel(mesh) {
-      var line = new Vector3(0, 10, 0);
-      var padding = .5;
-      var offset = mesh.position.clone().add(new Vector3(0, mesh.geometry.parameters.radius + padding, 0));
-      var lineMesh = gfx.drawLine(offset, line, white, .75);
-      var labelOrigin = gfx.movePoint(mesh.position, line.clone().add(new Vector3(0, padding, 0)));
-      var nameLabel = gfx.labelPoint(new Vector3(0, 0, 0), mesh.label, settings.axes.color);
-      nameLabel.position.set(labelOrigin.x, labelOrigin.y, labelOrigin.z);
-      nameLabel.geometry.computeBoundingBox(); // center align text
-
-      var translation = new Vector3(-1, 0, 0).multiplyScalar((nameLabel.geometry.boundingBox.max.x - nameLabel.geometry.boundingBox.min.x) / 2).add(new Vector3(0, padding * 2 + mesh.geometry.parameters.radius, 0));
-      nameLabel.geometry.translate(translation.x, translation.y, translation.z);
-      labelOrigin.add(new Vector3(0, translation.y, 0));
-      mesh.label = nameLabel;
-      mesh.line = lineMesh;
-      lineMesh.visible = false;
-      nameLabel.visible = false;
-      dataPointLabels.push(nameLabel);
-    },
-    preprocessWhiskey: function preprocessWhiskey(row) {
-      if (!uniqueCountries.includes(row.Country)) uniqueCountries.push(row.Country);
-
-      if (row.Name !== '*' && row.Rating !== '*' && row.Country !== '*' && row.Category !== '*' && row.Age !== '*' && row.ABV !== '*' && row.Brand !== '*' && row.Price !== '*' && parseInt(row.Price) < 125 && parseInt(row.Age) < 25 && (row.Country === 'USA' || row.Country === 'Scotland')) {
-        return {
-          name: row.Name,
-          rating: parseInt(row.Rating),
-          country: row.Country,
-          category: row.Category,
-          age: parseInt(row.Age),
-          abv: parseFloat(row.ABV),
-          brand: row.Brand,
-          price: row.Price
-        };
-      }
     },
     ramp: function ramp(color, index, total) {
       // pass a color interpolator or array of colors. will return a color based on percentage index / total

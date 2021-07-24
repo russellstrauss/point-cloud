@@ -60,7 +60,7 @@ module.exports = function() {
 			self.addStars();
 			self.createCurve();
 			self.setUpButtons();
-			// self.addVertexColors();
+			self.addVertexColors();
 			
 			var animate = function(now) {
 				requestAnimationFrame(animate);
@@ -73,26 +73,21 @@ module.exports = function() {
 		
 		everyFrame: function() {
 			
-			//this.updateCamera();
+			this.updateCamera();
 		},
 		
 		updateCamera: function() {
 			let clock = new THREE.Clock();
 			let dt = clock.getDelta();
 			clock.start();
-			
-			// curve_index = Math.round(curve.length * progress);
-			console.log(dt);
-			
-			// progress += dt * 1000 * camera_speed;
-			// if (progress > 1) progress = 0;
-			camera.position.set(curve[curve_index].x, curve[curve_index].y, curve[curve_index].z);
+			camera.position.set(curve[progress].x, curve[progress].y, curve[progress].z);
 			camera.lookAt(new THREE.Vector3(0,0,0));
+			progress++;
 		},
 		
 		createCurve: function() {
 			
-			let iteration_count = 10001; let step_delta = 0.001; let curve_length = step_delta * iteration_count; let radius_scale = 1; let a = .75; let k = .5; let height_scale = 2; let lower_bound = 1;
+			let iteration_count = 10001; let step_delta = 0.001; let curve_length = step_delta * iteration_count; let radius_scale = 1; let a = .05; let k = .9; let height_scale = 9; let lower_bound = 1;
 			let prevPt = new THREE.Vector3(0, 0, 0);
 			
 			for (let i = 0; i < curve_length; i += step_delta) {
@@ -103,7 +98,7 @@ module.exports = function() {
 				let spiral_z = radius_scale * a * Math.pow(Math.E, k * i) * Math.sin(i);
 				let spiralPt = new THREE.Vector3(spiral_x, spiral_y, spiral_z);
 				
-				let showLine = true;
+				let showLine = false;
 				if (showLine === true) gfx.drawLineFromPoints(prevPt, spiralPt);
 				
 				prevPt = spiralPt
@@ -115,10 +110,10 @@ module.exports = function() {
 		addStars: function() {
 			let geometry = new THREE.BufferGeometry();
 			let vertices = [];
-			for (let i = 0; i < 10000; i ++) {
-				vertices.push(THREE.MathUtils.randFloatSpread(2000)); // x
-				vertices.push(THREE.MathUtils.randFloatSpread(2000)); // y
-				vertices.push(THREE.MathUtils.randFloatSpread(2000)); // z
+			for (let i = 0; i < 10000; i++) {
+				vertices.push(THREE.MathUtils.randFloatSpread(4000)); // x
+				vertices.push(THREE.MathUtils.randFloatSpread(4000)); // y
+				vertices.push(THREE.MathUtils.randFloatSpread(4000)); // z
 			}
 			geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
 			let particles = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0x888888 }));
@@ -240,6 +235,15 @@ module.exports = function() {
 							colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateYlGnBu, true);
 							// colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateRgb('#24333A', '#E7582E'), true);
 							// colors = self.d3Stripes(geometry, colorSchemes[1]);
+							break;
+						case './assets/obj/chicken.obj':
+							mesh.scale.set(2.5, 2.5, 2.5);
+							colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateSinebow, true);
+							// colors = self.d3Stripes(geometry, colorSchemes[1]);
+							break;
+						case './assets/obj/box.obj':
+							mesh.scale.set(50, 50, 50);
+							colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateSinebow, true);
 							break;
 					}
 					

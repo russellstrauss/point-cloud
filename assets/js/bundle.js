@@ -67,7 +67,8 @@ module.exports = function () {
       gfx.setCameraLocation(camera, settings.defaultCameraLocation);
       self.addStars();
       self.createCurve();
-      self.setUpButtons(); // self.addVertexColors();
+      self.setUpButtons();
+      self.addVertexColors();
 
       var animate = function animate(now) {
         requestAnimationFrame(animate);
@@ -78,27 +79,25 @@ module.exports = function () {
 
       animate();
     },
-    everyFrame: function everyFrame() {//this.updateCamera();
+    everyFrame: function everyFrame() {
+      this.updateCamera();
     },
     updateCamera: function updateCamera() {
       var clock = new THREE.Clock();
       var dt = clock.getDelta();
-      clock.start(); // curve_index = Math.round(curve.length * progress);
-
-      console.log(dt); // progress += dt * 1000 * camera_speed;
-      // if (progress > 1) progress = 0;
-
-      camera.position.set(curve[curve_index].x, curve[curve_index].y, curve[curve_index].z);
+      clock.start();
+      camera.position.set(curve[progress].x, curve[progress].y, curve[progress].z);
       camera.lookAt(new THREE.Vector3(0, 0, 0));
+      progress++;
     },
     createCurve: function createCurve() {
       var iteration_count = 10001;
       var step_delta = 0.001;
       var curve_length = step_delta * iteration_count;
       var radius_scale = 1;
-      var a = .75;
-      var k = .5;
-      var height_scale = 2;
+      var a = .05;
+      var k = .9;
+      var height_scale = 9;
       var lower_bound = 1;
       var prevPt = new THREE.Vector3(0, 0, 0);
 
@@ -108,7 +107,7 @@ module.exports = function () {
         var spiral_y = height_scale * height_scale * Math.log(i, Math.E) + lower_bound;
         var spiral_z = radius_scale * a * Math.pow(Math.E, k * i) * Math.sin(i);
         var spiralPt = new THREE.Vector3(spiral_x, spiral_y, spiral_z);
-        var showLine = true;
+        var showLine = false;
         if (showLine === true) gfx.drawLineFromPoints(prevPt, spiralPt);
         prevPt = spiralPt;
         curve.push(spiralPt);
@@ -121,11 +120,11 @@ module.exports = function () {
       var vertices = [];
 
       for (var i = 0; i < 10000; i++) {
-        vertices.push(THREE.MathUtils.randFloatSpread(2000)); // x
+        vertices.push(THREE.MathUtils.randFloatSpread(4000)); // x
 
-        vertices.push(THREE.MathUtils.randFloatSpread(2000)); // y
+        vertices.push(THREE.MathUtils.randFloatSpread(4000)); // y
 
-        vertices.push(THREE.MathUtils.randFloatSpread(2000)); // z
+        vertices.push(THREE.MathUtils.randFloatSpread(4000)); // z
       }
 
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
@@ -245,6 +244,17 @@ module.exports = function () {
             colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateYlGnBu, true); // colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateRgb('#24333A', '#E7582E'), true);
             // colors = self.d3Stripes(geometry, colorSchemes[1]);
 
+            break;
+
+          case './assets/obj/chicken.obj':
+            mesh.scale.set(2.5, 2.5, 2.5);
+            colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateSinebow, true); // colors = self.d3Stripes(geometry, colorSchemes[1]);
+
+            break;
+
+          case './assets/obj/box.obj':
+            mesh.scale.set(50, 50, 50);
+            colors = self.interpolateD3Colors(geometry, color1, color2, d3.interpolateSinebow, true);
             break;
         }
 
@@ -516,7 +526,7 @@ var _require = require("three"),
         return renderer;
       },
       setUpCamera: function setUpCamera(camera) {
-        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 1000);
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 3000);
         return camera;
       },
       showPoints: function showPoints(geometry, color, opacity) {
